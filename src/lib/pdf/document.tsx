@@ -20,7 +20,14 @@ import {
 } from '@react-pdf/renderer'
 import { FontPreset } from './fonts'
 import { renderMarkdown, mdToPlainText, MarkdownStyles } from './markdown'
-import { TrimSize, trimToPoints } from './trim-sizes'
+import {
+  TrimSize,
+  trimToPoints,
+  TextSizeKey,
+  MarginPresetKey,
+  TEXT_SIZE_DELTA,
+  MARGIN_SCALE,
+} from './trim-sizes'
 
 export interface BookPdfProps {
   title: string
@@ -34,6 +41,8 @@ export interface BookPdfProps {
   }>
   preset: FontPreset
   trim: TrimSize
+  textSize?: TextSizeKey
+  marginPreset?: MarginPresetKey
   copyrightYear?: number
   logoImageBuffer?: Buffer | null
 }
@@ -69,12 +78,21 @@ function registerPreset(preset: FontPreset) {
   Font.registerHyphenationCallback((word) => [word])
 }
 
-function buildStyles(preset: FontPreset, trim: TrimSize) {
+function buildStyles(
+  preset: FontPreset,
+  trim: TrimSize,
+  textSize: TextSizeKey,
+  marginPreset: MarginPresetKey,
+) {
   const bodyFamily = preset.body.family
   const headFamily = preset.heading.family
 
-  // Body point size scales slightly to trim width
-  const basePt = trim.inches[0] >= 7 ? 11.5 : 11
+  // Body point size = trim default + user delta (small/normal/large)
+  const basePt = trim.defaultBodyPt + TEXT_SIZE_DELTA[textSize]
+
+  // Margins: trim default * user scale, convert inches -> points
+  const marginH = trim.defaultMarginsIn[0] * MARGIN_SCALE[marginPreset] * 72
+  const marginV = trim.defaultMarginsIn[1] * MARGIN_SCALE[marginPreset] * 72
 
   const markdown: MarkdownStyles = {
     paragraph: {
@@ -83,6 +101,9 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
       lineHeight: 1.55,
       textAlign: 'justify',
       marginBottom: 8,
+      // Widow/orphan control: never split so that <2 lines are alone on a page
+      widows: 2,
+      orphans: 2,
     },
     h1: {
       fontFamily: headFamily,
@@ -90,6 +111,9 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
       fontWeight: 'bold',
       marginTop: 18,
       marginBottom: 10,
+      // Don't leave a heading stranded at the bottom of a page:
+      // require at least 3 lines of content to follow, or break page.
+      minPresenceAhead: basePt * 4.5,
     },
     h2: {
       fontFamily: headFamily,
@@ -97,6 +121,7 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
       fontWeight: 'bold',
       marginTop: 14,
       marginBottom: 8,
+      minPresenceAhead: basePt * 3.5,
     },
     h3: {
       fontFamily: headFamily,
@@ -104,6 +129,7 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
       fontWeight: 'bold',
       marginTop: 10,
       marginBottom: 6,
+      minPresenceAhead: basePt * 3,
     },
     h4: {
       fontFamily: headFamily,
@@ -111,6 +137,7 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
       fontWeight: 'bold',
       marginTop: 8,
       marginBottom: 4,
+      minPresenceAhead: basePt * 2.5,
     },
     listItem: {
       fontFamily: bodyFamily,
@@ -153,9 +180,9 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
 
   const sheet = StyleSheet.create({
     page: {
-      paddingTop: 60,
-      paddingBottom: 60,
-      paddingHorizontal: trim.inches[0] >= 7 ? 72 : 54,
+      paddingTop: marginV,
+      paddingBottom: marginV,
+      paddingHorizontal: marginH,
       fontFamily: bodyFamily,
       fontSize: basePt,
       color: '#1f2937',
@@ -248,9 +275,9 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
     },
     runningHeader: {
       position: 'absolute',
-      top: 28,
-      left: 54,
-      right: 54,
+      top: marginV / 2.2,
+      left: marginH,
+      right: marginH,
       textAlign: 'center',
       fontFamily: headFamily,
       fontSize: 9,
@@ -260,9 +287,9 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
     },
     pageNumber: {
       position: 'absolute',
-      bottom: 28,
-      left: 54,
-      right: 54,
+      bottom: marginV / 2.2,
+      left: marginH,
+      right: marginH,
       textAlign: 'center',
       fontFamily: bodyFamily,
       fontSize: 9,
@@ -283,7 +310,12 @@ function buildStyles(preset: FontPreset, trim: TrimSize) {
 
 export function BookPdf(props: BookPdfProps) {
   registerPreset(props.preset)
-  const { sheet, markdown } = buildStyles(props.preset, props.trim)
+  const { sheet, markdown } = buildStyles(
+    props.preset,
+    props.trim,
+    props.textSize ?? 'normal',
+    props.marginPreset ?? 'normal',
+  )
   const pageSize = trimToPoints(props.trim)
   const year = props.copyrightYear ?? new Date().getFullYear()
 
@@ -340,7 +372,7 @@ export function BookPdf(props: BookPdfProps) {
             render={() => props.title.toUpperCase()}
             fixed
           />
-          <View style={sheet.chapterHeader}>
+          <View style={sheet.chapterHeader} wrap={false}>
             <Text style={sheet.chapterNumber}>Chapter {ch.number}</Text>
             <Text style={sheet.chapterTitle}>{ch.title}</Text>
           </View>

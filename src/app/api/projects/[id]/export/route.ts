@@ -3,7 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { checkEntitlement } from '@/lib/entitlements/service'
 import { renderBookPdf } from '@/lib/pdf/render'
 import { getFontPreset } from '@/lib/pdf/fonts'
-import { getTrim } from '@/lib/pdf/trim-sizes'
+import { getTrim, TextSizeKey, MarginPresetKey } from '@/lib/pdf/trim-sizes'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -23,6 +23,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const format: string = body?.format ?? 'pdf'
   const fontPresetKey: string | undefined = body?.fontPreset
   const trimKey: string | undefined = body?.trimSize
+  const textSize: TextSizeKey = (body?.textSize as TextSizeKey) ?? 'normal'
+  const marginPreset: MarginPresetKey = (body?.marginPreset as MarginPresetKey) ?? 'normal'
 
   const action = format === 'pdf' ? 'export_pdf' : 'export_text'
   const entitlement = await checkEntitlement(user.id, action, { projectId })
@@ -148,6 +150,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       })),
       preset,
       trim,
+      textSize,
+      marginPreset,
     })
 
     const admin = createAdminClient()
@@ -171,6 +175,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       metadata: {
         font_preset: preset.key,
         trim_size: trim.key,
+        text_size: textSize,
+        margin_preset: marginPreset,
         chapter_count: chapters.length,
         has_cover: !!coverBuffer,
       },
