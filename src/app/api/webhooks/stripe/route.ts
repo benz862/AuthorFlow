@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         plan_code: planCode,
         stripe_subscription_id: subscriptionId,
         stripe_price_id: priceId,
-        status: 'active',
+        subscription_status: 'active',
         current_period_end: currentPeriodEnd,
       }, { onConflict: 'user_id' })
       break
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('subscription_status').update({
         plan_code: planCode,
         stripe_price_id: priceId,
-        status: subscription.status,
+        subscription_status: subscription.status,
         current_period_end: currentPeriodEnd,
       }).eq('stripe_subscription_id', subscription.id)
       break
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
       await supabase.from('subscription_status').update({
         plan_code: 'freedom',
-        status: 'canceled',
+        subscription_status: 'canceled',
         stripe_subscription_id: null,
         stripe_price_id: null,
       }).eq('stripe_subscription_id', subscription.id)
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       const invoice = event.data.object as Stripe.Invoice
       const subId = (invoice as unknown as { subscription?: string }).subscription
       if (subId) {
-        await supabase.from('subscription_status').update({ status: 'past_due' }).eq('stripe_subscription_id', subId)
+        await supabase.from('subscription_status').update({ subscription_status: 'past_due' }).eq('stripe_subscription_id', subId)
       }
       break
     }
