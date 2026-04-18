@@ -6,7 +6,7 @@ import { ProjectSidebar } from '@/components/layout/sidebar'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { BookProject } from '@/lib/types/database'
-import { Download, FileType2, FileText, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { Download, FileType2, FileText, CheckCircle2, XCircle, Clock, BookOpen, Gift, Trash2, Upload, Image as ImageIcon } from 'lucide-react'
 import { FONT_PRESETS, DEFAULT_FONT_PRESET, FontPresetKey, FontPreset } from '@/lib/pdf/fonts'
 import {
   TRIM_SIZES,
@@ -105,14 +105,57 @@ export default function ExportsPage() {
   const [format, setFormat] = useState<'pdf' | 'md'>('pdf')
   const [textSize, setTextSize] = useState<TextSizeKey>('normal')
   const [marginPreset, setMarginPreset] = useState<MarginPresetKey>('normal')
+  const [exportMode, setExportMode] = useState<'full' | 'sample'>('full')
+  const [includeChapters, setIncludeChapters] = useState<number>(1)
+  const [purchaseUrl, setPurchaseUrl] = useState<string>('')
+  const [ctaMessage, setCtaMessage] = useState<string>('')
+
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [includeLogo, setIncludeLogo] = useState(true)
+  const [chapterCount, setChapterCount] = useState(0)
 
   useEffect(() => {
     supabase.from('book_projects').select('*').eq('id', projectId).single().then(({ data }) => {
       setProject(data)
       if (data?.trim_size) setTrimKey(data.trim_size)
     })
+    supabase
+      .from('book_chapters')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .then(({ count }) => setChapterCount(count ?? 0))
+    supabase
+      .from('book_assets')
+      .select('public_url')
+      .eq('project_id', projectId)
+      .eq('asset_type', 'logo')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setLogoUrl(data?.public_url ?? null))
     refreshJobs()
   }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleLogoUpload = async (file: File) => {
+    setLogoUploading(true)
+    setError('')
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`/api/projects/${projectId}/logo`, { method: 'POST', body: fd })
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data.error ?? 'Logo upload failed')
+    } else if (data.asset?.public_url) {
+      setLogoUrl(data.asset.public_url)
+    }
+    setLogoUploading(false)
+  }
+
+  const handleLogoDelete = async () => {
+    await fetch(`/api/projects/${projectId}/logo`, { method: 'DELETE' })
+    setLogoUrl(null)
+  }
 
   const refreshJobs = async () => {
     const { data: jobData } = await supabase.from('export_jobs').select('*').eq('project_id', projectId).order('created_at', { ascending: false })
@@ -133,7 +176,16 @@ export default function ExportsPage() {
     const res = await fetch(`/api/projects/${projectId}/export`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ format, fontPreset, trimSize: trimKey, textSize, marginPreset }),
+      body: JSON.stringify({
+        format,
+        fontPreset,
+        trimSize: trimKey,
+        textSize,
+        marginPreset,
+        exportMode,
+        sampleOptions: { includeChapters, purchaseUrl: purchaseUrl.trim(), ctaMessage: ctaMessage.trim() },
+        includeLogo,
+      }),
     })
     const data = await res.json()
     if (!res.ok) {
@@ -200,6 +252,166 @@ export default function ExportsPage() {
 
         {format === 'pdf' && (
           <>
+            {/* Export mode: Full vs Sample */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-700">Export Mode</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Full book, or a short freebie to give away as a lead magnet.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setExportMode('full')}
+                  className={`flex items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-all ${exportMode === 'full' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <BookOpen className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Full Book</p>
+                    <p className="text-xs text-gray-500">All {chapterCount || '—'} chapters, for sale or distribution.</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setExportMode('sample')}
+                  className={`flex items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-all ${exportMode === 'sample' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <Gift className="h-5 w-5 text-pink-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Sample / Freebie</p>
+                    <p className="text-xs text-gray-500">First few chapters + a call-to-action to buy the full book.</p>
+                  </div>
+                </button>
+              </div>
+
+              {exportMode === 'sample' && (
+                <div className="pt-2 border-t border-gray-100 space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Include chapters</label>
+                    <div className="grid grid-cols-5 gap-2 mt-1.5">
+                      {[1, 2, 3, 4, 5].map((n) => {
+                        const disabled = n > chapterCount
+                        return (
+                          <button
+                            key={n}
+                            disabled={disabled}
+                            onClick={() => setIncludeChapters(n)}
+                            className={`rounded-lg border-2 py-2 text-sm font-medium transition-all ${
+                              includeChapters === n && !disabled
+                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                : disabled
+                                  ? 'border-gray-100 text-gray-300 cursor-not-allowed'
+                                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            {n === 1 ? 'Ch. 1' : `First ${n}`}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      {chapterCount > 0
+                        ? `${includeChapters} of ${chapterCount} chapters will be included. The rest appear as locked entries in the TOC.`
+                        : 'No chapters found yet — generate chapters before exporting a sample.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Purchase URL (where readers buy the full book)</label>
+                    <input
+                      type="url"
+                      value={purchaseUrl}
+                      onChange={(e) => setPurchaseUrl(e.target.value)}
+                      placeholder="https://authorflow.app/books/your-book"
+                      className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Leave blank if you want to fill it in later. The CTA page includes a button linking here.</p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Short teaser line (optional)</label>
+                    <input
+                      type="text"
+                      value={ctaMessage}
+                      onChange={(e) => setCtaMessage(e.target.value)}
+                      placeholder="The rest of the story unfolds into..."
+                      maxLength={160}
+                      className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">One italicized line above the Buy button. Keep it under 160 characters.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Logo / branding */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-700">Logo &amp; Branding</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Adds your logo to the title page and the sample CTA page.</p>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-gray-600 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={includeLogo}
+                    onChange={(e) => setIncludeLogo(e.target.checked)}
+                    className="rounded"
+                  />
+                  Include in PDF
+                </label>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="h-20 w-20 shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
+                  {logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-gray-300" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  {logoUrl ? (
+                    <div className="flex gap-2">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            if (f) handleLogoUpload(f)
+                            e.target.value = ''
+                          }}
+                        />
+                        <Button variant="outline" size="sm" className="gap-1.5" loading={logoUploading} asChild={false}>
+                          <span className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Replace</span>
+                        </Button>
+                      </label>
+                      <Button variant="outline" size="sm" onClick={handleLogoDelete} className="gap-1.5 text-red-600">
+                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (f) handleLogoUpload(f)
+                          e.target.value = ''
+                        }}
+                      />
+                      <Button variant="outline" size="sm" className="gap-1.5" loading={logoUploading} asChild={false}>
+                        <span className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Upload logo</span>
+                      </Button>
+                    </label>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1.5">PNG, JPEG, WebP, or SVG. Max 5 MB. Transparent PNG recommended.</p>
+                </div>
+              </div>
+            </div>
+
             {/* Font preset — with live previews */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
               <div>

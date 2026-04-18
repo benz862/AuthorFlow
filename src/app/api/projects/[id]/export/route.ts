@@ -25,6 +25,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const trimKey: string | undefined = body?.trimSize
   const textSize: TextSizeKey = (body?.textSize as TextSizeKey) ?? 'normal'
   const marginPreset: MarginPresetKey = (body?.marginPreset as MarginPresetKey) ?? 'normal'
+  const exportMode: 'full' | 'sample' = body?.exportMode === 'sample' ? 'sample' : 'full'
+  const sampleOptions = {
+    includeChapters: Math.max(1, Math.min(5, Number(body?.sampleOptions?.includeChapters ?? 1))),
+    purchaseUrl: typeof body?.sampleOptions?.purchaseUrl === 'string' ? body.sampleOptions.purchaseUrl.trim() : undefined,
+    ctaMessage: typeof body?.sampleOptions?.ctaMessage === 'string' ? body.sampleOptions.ctaMessage.trim() : undefined,
+  }
+  const includeLogo: boolean = body?.includeLogo !== false // default true
 
   const action = format === 'pdf' ? 'export_pdf' : 'export_text'
   const entitlement = await checkEntitlement(user.id, action, { projectId })
@@ -126,6 +133,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
+    // Optional logo for title page + CTA branding
+    let logoBuffer: Buffer | null = null
+    if (includeLogo) {
+      const { data: logoAsset } = await supabase
+        .from('book_assets')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('asset_type', 'logo')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (logoAsset?.public_url) {
+        try {
+          const res = await fetch(logoAsset.public_url)
+          if (res.ok) logoBuffer = Buffer.from(await res.arrayBuffer())
+        } catch {
+          // non-fatal
+        }
+      }
+    }
+
     // Author name
     const { data: profile } = await supabase
       .from('profiles')
@@ -138,11 +167,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const preset = getFontPreset(fontPresetKey ?? null)
     const trim = getTrim(trimKey ?? project.trim_size ?? null)
 
+    const totalWordCount = chapters.reduce(
+      (acc, c) => acc + (c.content_markdown ?? '').split(/\s+/).filter(Boolean).length,
+      0,
+    )
+
     const pdfBuffer = await renderBookPdf({
       title: project.title,
       subtitle: project.subtitle,
       authorName,
       coverImageBuffer: coverBuffer,
+      logoImageBuffer: logoBuffer,
       chapters: chapters.map((c) => ({
         number: c.chapter_number,
         title: c.title,
@@ -152,6 +187,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       trim,
       textSize,
       marginPreset,
+      exportMode,
+      sampleOptions: exportMode === 'sample' ? sampleOptions : undefined,
+      totalChapterCount: chapters.length,
+      totalWordCount,
     })
 
     const admin = createAdminClient()
