@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { BookProject } from '@/lib/types/database'
-import { getIntakeQuestions } from '@/lib/ai/intake'
+import { getIntakeQuestions } from '@/lib/intake/questions'
 import { IntakeQuestion } from '@/lib/types/app'
 import { CheckCircle2, ChevronRight } from 'lucide-react'
 
