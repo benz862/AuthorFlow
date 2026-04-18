@@ -1,12 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ProjectSidebar } from '@/components/layout/sidebar'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { BookProject } from '@/lib/types/database'
-import { Download, FileType2, FileText, CheckCircle2, XCircle, Clock, BookOpen, Gift, Trash2, Upload, Image as ImageIcon } from 'lucide-react'
+import { Download, FileType2, FileText, CheckCircle2, XCircle, Clock, BookOpen, Gift, Trash2, Upload, Image as ImageIcon, Sparkles, Loader2 } from 'lucide-react'
 import { FONT_PRESETS, DEFAULT_FONT_PRESET, FontPresetKey, FontPreset } from '@/lib/pdf/fonts'
 import {
   TRIM_SIZES,
@@ -29,6 +29,14 @@ type AssetRow = {
   id: string
   public_url: string | null
   asset_type: string
+}
+
+type CoverUpgrade = {
+  id: string
+  status: 'pending' | 'paid' | 'processing' | 'ready' | 'failed'
+  print_ready_url: string | null
+  error_message?: string | null
+  asset_id: string
 }
 
 /** Inject @font-face rules so the browser renders the same fonts as the PDF. */
@@ -88,6 +96,8 @@ function useFontFaceInjection() {
 
 export default function ExportsPage() {
   const params = useParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const projectId = params.id as string
 
@@ -115,6 +125,13 @@ export default function ExportsPage() {
   const [includeLogo, setIncludeLogo] = useState(true)
   const [chapterCount, setChapterCount] = useState(0)
 
+  // Print-ready cover upgrade state
+  const [coverQuality, setCoverQuality] = useState<'digital' | 'print'>('digital')
+  const [hasCover, setHasCover] = useState<boolean>(false)
+  const [coverUpgrade, setCoverUpgrade] = useState<CoverUpgrade | null>(null)
+  const [upgradeProcessing, setUpgradeProcessing] = useState<boolean>(false)
+  const [upgradeNotice, setUpgradeNotice] = useState<string>('')
+
   useEffect(() => {
     supabase.from('book_projects').select('*').eq('id', projectId).single().then(({ data }) => {
       setProject(data)
@@ -135,7 +152,95 @@ export default function ExportsPage() {
       .maybeSingle()
       .then(({ data }) => setLogoUrl(data?.public_url ?? null))
     refreshJobs()
+    refreshCoverUpgrade()
   }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle Stripe Checkout redirect back from the cover upgrade flow.
+  useEffect(() => {
+    const status = searchParams.get('cover_upgrade')
+    const upgradeId = searchParams.get('upgrade_id')
+    if (!status) return
+
+    if (status === 'canceled') {
+      setUpgradeNotice('Cover upgrade canceled — you were not charged.')
+      router.replace(`/projects/${projectId}/exports`)
+      return
+    }
+    if (status === 'success') {
+      setCoverQuality('print')
+      setUpgradeNotice('Payment received — upscaling your cover to print quality. This takes about a minute.')
+      // Kick off the upscale (idempotent) and poll.
+      runUpgradeProcess(upgradeId ?? undefined).finally(() => {
+        router.replace(`/projects/${projectId}/exports`)
+      })
+    }
+  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const refreshCoverUpgrade = async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/cover-upgrade/status`)
+      const data = await res.json()
+      setHasCover(!!data.hasCover)
+      setCoverUpgrade(data.upgrade ?? null)
+      if (data.upgrade?.status === 'ready') setCoverQuality((q) => q) // keep user choice
+    } catch {
+      // non-fatal
+    }
+  }
+
+  const runUpgradeProcess = async (upgradeId?: string) => {
+    setUpgradeProcessing(true)
+    try {
+      // Poll: call process (may kick off work), then keep checking status until ready/failed.
+      await fetch(`/api/projects/${projectId}/cover-upgrade/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(upgradeId ? { upgradeId } : {}),
+      })
+
+      // Poll status
+      const start = Date.now()
+      while (Date.now() - start < 5 * 60_000) {
+        await new Promise((r) => setTimeout(r, 2500))
+        const res = await fetch(`/api/projects/${projectId}/cover-upgrade/status`)
+        const data = await res.json()
+        setCoverUpgrade(data.upgrade ?? null)
+        if (data.upgrade?.status === 'ready') {
+          setUpgradeNotice('Print-ready cover is ready. It will be used on your next PDF export.')
+          break
+        }
+        if (data.upgrade?.status === 'failed') {
+          setUpgradeNotice(`Upscale failed: ${data.upgrade.error_message ?? 'unknown error'}. We can retry.`)
+          break
+        }
+      }
+    } finally {
+      setUpgradeProcessing(false)
+    }
+  }
+
+  const startCoverUpgradeCheckout = async () => {
+    setError('')
+    setUpgradeNotice('')
+    const res = await fetch(`/api/projects/${projectId}/cover-upgrade/checkout`, { method: 'POST' })
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data.error ?? 'Could not start checkout')
+      return
+    }
+    if (data.alreadyPurchased) {
+      setCoverUpgrade(data.upgrade)
+      setUpgradeNotice('This cover is already upgraded — print-ready version will be used.')
+      return
+    }
+    if (data.url) window.location.href = data.url
+  }
+
+  const retryUpgradeProcess = async () => {
+    if (!coverUpgrade) return
+    setUpgradeNotice('Retrying upscale...')
+    await runUpgradeProcess(coverUpgrade.id)
+  }
 
   const handleLogoUpload = async (file: File) => {
     setLogoUploading(true)
@@ -170,9 +275,29 @@ export default function ExportsPage() {
   }
 
   const handleExport = async () => {
-    setExporting(true)
     setError('')
     setLastUrl(null)
+
+    // If user selected print-ready but upgrade is not ready, route them to Stripe first.
+    if (format === 'pdf' && coverQuality === 'print' && hasCover) {
+      if (!coverUpgrade || coverUpgrade.status === 'pending') {
+        await startCoverUpgradeCheckout()
+        return
+      }
+      if (coverUpgrade.status !== 'ready') {
+        await runUpgradeProcess(coverUpgrade.id)
+        // Re-check
+        const res = await fetch(`/api/projects/${projectId}/cover-upgrade/status`)
+        const data = await res.json()
+        setCoverUpgrade(data.upgrade ?? null)
+        if (data.upgrade?.status !== 'ready') {
+          setError('Print-ready cover is not ready yet — try again in a moment.')
+          return
+        }
+      }
+    }
+
+    setExporting(true)
     const res = await fetch(`/api/projects/${projectId}/export`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -185,6 +310,7 @@ export default function ExportsPage() {
         exportMode,
         sampleOptions: { includeChapters, purchaseUrl: purchaseUrl.trim(), ctaMessage: ctaMessage.trim() },
         includeLogo,
+        coverQuality,
       }),
     })
     const data = await res.json()
@@ -411,6 +537,83 @@ export default function ExportsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Cover Quality — $4.99 print-ready upgrade */}
+            {hasCover && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-700">Cover Quality</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Digital covers look great on screen. For print-on-demand (KDP, IngramSpark), you&apos;ll want 300 DPI.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setCoverQuality('digital')}
+                    className={`flex items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-all ${coverQuality === 'digital' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  >
+                    <ImageIcon className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Digital <span className="text-xs text-green-600 font-normal">(included)</span></p>
+                      <p className="text-xs text-gray-500">Crisp on-screen. Perfect for ebooks, blog, ads.</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setCoverQuality('print')}
+                    className={`flex items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-all ${coverQuality === 'print' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  >
+                    <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Print-Ready{' '}
+                        {coverUpgrade?.status === 'ready'
+                          ? <span className="text-xs text-green-600 font-normal">(purchased)</span>
+                          : <span className="text-xs text-amber-600 font-normal">+$4.99</span>}
+                      </p>
+                      <p className="text-xs text-gray-500">4× upscale to 300 DPI. Ready for KDP / IngramSpark.</p>
+                    </div>
+                  </button>
+                </div>
+
+                {coverQuality === 'print' && (
+                  <div className="pt-2 border-t border-gray-100 space-y-2">
+                    {coverUpgrade?.status === 'ready' && (
+                      <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-lg p-2.5">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span>Print-ready version on file — it will be embedded in your next PDF export.</span>
+                      </div>
+                    )}
+                    {(coverUpgrade?.status === 'paid' || coverUpgrade?.status === 'processing' || upgradeProcessing) && (
+                      <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg p-2.5">
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                        <span>Upscaling your cover to 300 DPI — this usually takes under a minute.</span>
+                      </div>
+                    )}
+                    {coverUpgrade?.status === 'failed' && (
+                      <div className="flex items-start justify-between gap-2 text-xs text-red-700 bg-red-50 rounded-lg p-2.5">
+                        <div className="flex items-start gap-2">
+                          <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                          <span>Upscale failed: {coverUpgrade.error_message ?? 'unknown error'}.</span>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={retryUpgradeProcess} loading={upgradeProcessing}>Retry</Button>
+                      </div>
+                    )}
+                    {(!coverUpgrade || coverUpgrade.status === 'pending') && (
+                      <div className="flex items-center justify-between gap-3 text-xs text-gray-600 bg-gray-50 rounded-lg p-2.5">
+                        <span>You&apos;ll be sent to Stripe to complete the $4.99 one-time purchase, then we upscale your cover automatically.</span>
+                        <Button size="sm" onClick={startCoverUpgradeCheckout} className="gap-1.5 shrink-0">
+                          <Sparkles className="h-3.5 w-3.5" /> Upgrade $4.99
+                        </Button>
+                      </div>
+                    )}
+                    {upgradeNotice && (
+                      <p className="text-xs text-gray-500 italic">{upgradeNotice}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Font preset — with live previews */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">

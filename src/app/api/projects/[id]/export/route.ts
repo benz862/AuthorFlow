@@ -32,6 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ctaMessage: typeof body?.sampleOptions?.ctaMessage === 'string' ? body.sampleOptions.ctaMessage.trim() : undefined,
   }
   const includeLogo: boolean = body?.includeLogo !== false // default true
+  const coverQuality: 'digital' | 'print' = body?.coverQuality === 'print' ? 'print' : 'digital'
 
   const action = format === 'pdf' ? 'export_pdf' : 'export_text'
   const entitlement = await checkEntitlement(user.id, action, { projectId })
@@ -123,10 +124,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .limit(1)
       .maybeSingle()
 
+    // Prefer print-ready upgrade URL if user asked for it AND one is ready
+    let sourceCoverUrl: string | null = coverAsset?.public_url ?? null
+    if (coverQuality === 'print' && coverAsset) {
+      const { data: upgrade } = await supabase
+        .from('cover_upgrades')
+        .select('print_ready_url, status')
+        .eq('asset_id', coverAsset.id)
+        .eq('status', 'ready')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (upgrade?.print_ready_url) sourceCoverUrl = upgrade.print_ready_url
+    }
+
     let coverBuffer: Buffer | null = null
-    if (coverAsset?.public_url) {
+    if (sourceCoverUrl) {
       try {
-        const res = await fetch(coverAsset.public_url)
+        const res = await fetch(sourceCoverUrl)
         if (res.ok) coverBuffer = Buffer.from(await res.arrayBuffer())
       } catch {
         // non-fatal; PDF will render without cover

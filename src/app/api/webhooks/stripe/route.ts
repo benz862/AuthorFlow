@@ -21,6 +21,23 @@ export async function POST(request: NextRequest) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.CheckoutSession
       const userId = session.metadata?.user_id
+
+      // One-time cover upgrade purchase
+      if (userId && session.mode === 'payment' && session.metadata?.type === 'cover_upgrade') {
+        const upgradeId = session.metadata.upgrade_id
+        if (upgradeId) {
+          await supabase
+            .from('cover_upgrades')
+            .update({
+              status: 'paid',
+              stripe_payment_intent_id: (session.payment_intent as string) ?? null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', upgradeId)
+        }
+        break
+      }
+
       if (!userId || session.mode !== 'subscription') break
 
       const customerId = session.customer as string
