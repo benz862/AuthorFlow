@@ -68,12 +68,12 @@ export default function CoverPage() {
             <div className="flex justify-center">
               <div className="relative w-64 shadow-2xl rounded-lg overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={cover.storage_path} alt="Book cover" className="w-full" />
+                <img src={cover.public_url ?? ''} alt="Book cover" className="w-full" />
               </div>
             </div>
-            {cover.storage_path && (
+            {cover.public_url && (
               <div className="flex justify-center">
-                <a href={cover.storage_path} download>
+                <a href={cover.public_url} download>
                   <Button variant="outline" className="gap-1.5">
                     <Download className="h-4 w-4" /> Download Cover
                   </Button>
