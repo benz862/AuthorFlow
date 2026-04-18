@@ -32,6 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { data: job, error: jobErr } = await supabase.from('export_jobs').insert({
     project_id: projectId,
     user_id: user.id,
+    export_type: format,
     export_format: format,
     status: 'processing',
     version_number: project.current_version_number,
