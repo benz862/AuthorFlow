@@ -36,9 +36,19 @@ ${researchContext || 'No specific research context provided.'}
 Author's Project Summary:
 ${intakeSummary}
 
-Write the full chapter in Markdown format. Use appropriate headings, subheadings, and formatting.
-Start directly with the chapter content (no chapter number prefix needed — it will be added automatically).
-Write approximately ${targetWords} words.
+FORMAT THE CHAPTER WITH PROPER MARKDOWN STRUCTURE:
+- Use "## Section Heading" every ~800-1200 words to break up the chapter into clear sections
+- Use "### Subsection" inside sections when a further break helps the reader
+- Use bulleted lists ("- item") for enumerations, steps, key takeaways, checklists
+- Use numbered lists ("1. item") for ordered sequences or processes
+- Use "> quote" for block quotes, testimonials, or emphasis callouts
+- Use **bold** for key terms on first mention and important phrases
+- Use *italics* for book/product names and subtle emphasis
+- Keep paragraphs tight (3-5 sentences typical). White space aids readability.
+- For ${project.book_type === 'fiction' ? 'fiction: lean on prose and scene, use formatting sparingly' : 'non-fiction: use headers, bullets, and callouts liberally to aid scannability'}.
+
+Start directly with the chapter content (no chapter number prefix — it will be added automatically by the renderer).
+Target approximately ${targetWords} words.
 `
 
   const content = await generateText(prompt, SYSTEM_PROMPT, 8192)
