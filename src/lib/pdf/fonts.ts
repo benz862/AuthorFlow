@@ -1,9 +1,9 @@
 /**
- * Curated font pairings for PDF export. All Google Fonts (open license).
- * We embed TTF files so the rendered PDF looks identical on every device.
+ * Curated font pairings for PDF export.
  *
- * Each preset has a serif/humanist body (readable over long passages) and
- * a companion display face for headings. The author picks one per book.
+ * We serve fonts from the jsdelivr CDN mirror of @fontsource — stable,
+ * versioned URLs that won't 404 the way hashed fonts.gstatic.com URLs do.
+ * @react-pdf/renderer fetches these TTFs at render time.
  */
 
 export type FontPresetKey =
@@ -32,8 +32,16 @@ export interface FontPreset {
   }
 }
 
-// Google Fonts static TTF URLs — @react-pdf/renderer fetches these at render time.
-const GFONTS = 'https://fonts.gstatic.com/s'
+/**
+ * Fontsource TTF files on jsdelivr.
+ * Pattern: https://cdn.jsdelivr.net/npm/@fontsource/{pkg}@5/files/{pkg}-latin-{weight}-{style}.ttf
+ */
+const FS = 'https://cdn.jsdelivr.net/npm/@fontsource'
+
+function fsUrl(pkg: string, weight: 400 | 700, style: 'normal' | 'italic'): string {
+  // Fontsource ships .woff on jsdelivr; @react-pdf/renderer supports woff.
+  return `${FS}/${pkg}@5/files/${pkg}-latin-${weight}-${style}.woff`
+}
 
 export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
   classic: {
@@ -43,15 +51,15 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
     recommendedFor: 'Novels, memoir, general non-fiction',
     body: {
       family: 'Merriweather',
-      regular: `${GFONTS}/merriweather/v30/u-440qyriQwlOrhSvowK_l5-fCZMdeX3rg.ttf`,
-      bold: `${GFONTS}/merriweather/v30/u-4n0qyriQwlOrhSvowK_l521wRpX837pvjxPA.ttf`,
-      italic: `${GFONTS}/merriweather/v30/u-4l0qyriQwlOrhSvowK_l5-eRZOf-c.ttf`,
-      boldItalic: `${GFONTS}/merriweather/v30/u-4j0qyriQwlOrhSvowK_l5-eR71Wvf7MGUp0Qw.ttf`,
+      regular: fsUrl('merriweather', 400, 'normal'),
+      bold: fsUrl('merriweather', 700, 'normal'),
+      italic: fsUrl('merriweather', 400, 'italic'),
+      boldItalic: fsUrl('merriweather', 700, 'italic'),
     },
     heading: {
       family: 'Montserrat',
-      regular: `${GFONTS}/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aXo.ttf`,
-      bold: `${GFONTS}/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtp6Hw5aXr-pNM.ttf`,
+      regular: fsUrl('montserrat', 400, 'normal'),
+      bold: fsUrl('montserrat', 700, 'normal'),
     },
   },
   modern: {
@@ -61,15 +69,15 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
     recommendedFor: 'Business, self-help, how-to',
     body: {
       family: 'Lora',
-      regular: `${GFONTS}/lora/v35/0QI6MX1D_JOuGQbT0gvTJPa787weuyJGmKxemMeZ.ttf`,
-      bold: `${GFONTS}/lora/v35/0QI6MX1D_JOuGQbT0gvTJPa787z5vCJGmKxemMeZ967e.ttf`,
-      italic: `${GFONTS}/lora/v35/0QIgMX1D_JOuMw_7LdTDxtoMQc2nmZn4iZs.ttf`,
-      boldItalic: `${GFONTS}/lora/v35/0QIgMX1D_JOuMw_7LdTDxtoMQc23m5n4iZsxEpPFi8E.ttf`,
+      regular: fsUrl('lora', 400, 'normal'),
+      bold: fsUrl('lora', 700, 'normal'),
+      italic: fsUrl('lora', 400, 'italic'),
+      boldItalic: fsUrl('lora', 700, 'italic'),
     },
     heading: {
       family: 'Inter',
-      regular: `${GFONTS}/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50ojIa2ZL7Sd3VGtH48A.ttf`,
-      bold: `${GFONTS}/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50ojIa1ZL7W0Q5nwc.ttf`,
+      regular: fsUrl('inter', 400, 'normal'),
+      bold: fsUrl('inter', 700, 'normal'),
     },
   },
   literary: {
@@ -79,33 +87,33 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
     recommendedFor: 'Literary fiction, essays, poetry',
     body: {
       family: 'EB Garamond',
-      regular: `${GFONTS}/ebgaramond/v30/SlGDmQSNjdsmc35JDF1K5E55YMjF_7DPuGi-6_RkAo9Wlw.ttf`,
-      bold: `${GFONTS}/ebgaramond/v30/SlGDmQSNjdsmc35JDF1K5E55YMjF_7DPuGi-zPRkAo9Wlw.ttf`,
-      italic: `${GFONTS}/ebgaramond/v30/SlGFmQSNjdsmc35JDF1K5GRwUjcdlttVFm-rI7e8QL98Wwo.ttf`,
-      boldItalic: `${GFONTS}/ebgaramond/v30/SlGFmQSNjdsmc35JDF1K5GRwUjcdlttVFm-rI1q8QL98Wwo.ttf`,
+      regular: fsUrl('eb-garamond', 400, 'normal'),
+      bold: fsUrl('eb-garamond', 700, 'normal'),
+      italic: fsUrl('eb-garamond', 400, 'italic'),
+      boldItalic: fsUrl('eb-garamond', 700, 'italic'),
     },
     heading: {
       family: 'Playfair Display',
-      regular: `${GFONTS}/playfairdisplay/v37/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKdFvXDXbtM.ttf`,
-      bold: `${GFONTS}/playfairdisplay/v37/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKf0vnDXbtM.ttf`,
+      regular: fsUrl('playfair-display', 400, 'normal'),
+      bold: fsUrl('playfair-display', 700, 'normal'),
     },
   },
   technical: {
     key: 'technical',
     label: 'Technical',
-    description: 'Source Serif 4 body + Source Sans 3 headers',
+    description: 'Source Serif body + Source Sans headers',
     recommendedFor: 'Technical, academic, reference',
     body: {
-      family: 'Source Serif 4',
-      regular: `${GFONTS}/sourceserif4/v8/vEFy2_tTDB4M7-auWDN0ahZJW3IX2ih5nk3AucvUHf6OAVIJmeUDygwjihdqrhxXD-wGvjU.ttf`,
-      bold: `${GFONTS}/sourceserif4/v8/vEFy2_tTDB4M7-auWDN0ahZJW3IX2ih5nk3AucvUHf6OAVIJmeUDygwjipVqrhxXD-wGvjU.ttf`,
-      italic: `${GFONTS}/sourceserif4/v8/vEFI2_tTDB4M7-auWDN0ahZJW3IX2ih5nk3AucvUHf6OAVIJmeUDygwjihdqrhxXD-wGvjU.ttf`,
-      boldItalic: `${GFONTS}/sourceserif4/v8/vEFI2_tTDB4M7-auWDN0ahZJW3IX2ih5nk3AucvUHf6OAVIJmeUDygwjipVqrhxXD-wGvjU.ttf`,
+      family: 'Source Serif Pro',
+      regular: fsUrl('source-serif-pro', 400, 'normal'),
+      bold: fsUrl('source-serif-pro', 700, 'normal'),
+      italic: fsUrl('source-serif-pro', 400, 'italic'),
+      boldItalic: fsUrl('source-serif-pro', 700, 'italic'),
     },
     heading: {
-      family: 'Source Sans 3',
-      regular: `${GFONTS}/sourcesans3/v15/nwpBtKy2OAdR1K-IwhWudF-R9QMylBJAV3Bo8Ky46hs.ttf`,
-      bold: `${GFONTS}/sourcesans3/v15/nwpBtKy2OAdR1K-IwhWudF-R9QMylBJAV3Bo9Kyw6hs.ttf`,
+      family: 'Source Sans Pro',
+      regular: fsUrl('source-sans-pro', 400, 'normal'),
+      bold: fsUrl('source-sans-pro', 700, 'normal'),
     },
   },
   friendly: {
@@ -115,15 +123,15 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
     recommendedFor: "Kids', YA, light non-fiction",
     body: {
       family: 'Nunito',
-      regular: `${GFONTS}/nunito/v26/XRXV3I6Li01BKofINeaBTMnFcQ.ttf`,
-      bold: `${GFONTS}/nunito/v26/XRXW3I6Li01BKofA6sKUbevIWtE.ttf`,
-      italic: `${GFONTS}/nunito/v26/XRXX3I6Li01BKofIMeaBXso.ttf`,
-      boldItalic: `${GFONTS}/nunito/v26/XRXY3I6Li01BKofIMOaETM_FcCIG.ttf`,
+      regular: fsUrl('nunito', 400, 'normal'),
+      bold: fsUrl('nunito', 700, 'normal'),
+      italic: fsUrl('nunito', 400, 'italic'),
+      boldItalic: fsUrl('nunito', 700, 'italic'),
     },
     heading: {
       family: 'Nunito',
-      regular: `${GFONTS}/nunito/v26/XRXV3I6Li01BKofINeaBTMnFcQ.ttf`,
-      bold: `${GFONTS}/nunito/v26/XRXW3I6Li01BKofA6sKUbevIWtE.ttf`,
+      regular: fsUrl('nunito', 400, 'normal'),
+      bold: fsUrl('nunito', 700, 'normal'),
     },
   },
 }
