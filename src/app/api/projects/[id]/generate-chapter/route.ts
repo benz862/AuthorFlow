@@ -15,7 +15,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const body = await request.json()
   const { chapterOutline, previousSummary } = body
 
-  const existingChapter = await supabase.from('book_chapters').select('*').eq('project_id', projectId).eq('chapter_number', chapterOutline.number).single()
+  const existingChapter = await supabase.from('book_chapters').select('*').eq('project_id', projectId).eq('chapter_number', chapterOutline.number).maybeSingle()
   const action = existingChapter.data ? 'regenerate_chapter' : 'generate_chapter'
 
   const entitlement = await checkEntitlement(user.id, action, { projectId, chapterNumber: chapterOutline.number })

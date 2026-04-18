@@ -47,11 +47,19 @@ export default function ChaptersPage() {
     if (!chapterOutline) return
     setGenerating(chapterNumber)
     const prevChapter = chapters.find((c) => c.chapter_number === chapterNumber - 1)
-    await fetch(`/api/projects/${projectId}/generate-chapter`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chapterOutline, previousSummary: prevChapter?.summary ?? '' }),
-    })
+    try {
+      const res = await fetch(`/api/projects/${projectId}/generate-chapter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapterOutline, previousSummary: prevChapter?.summary ?? '' }),
+      })
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: 'Unknown error' }))
+        alert(`Chapter generation failed: ${errBody.error ?? res.statusText}`)
+      }
+    } catch (e) {
+      alert(`Chapter generation failed: ${e instanceof Error ? e.message : 'network error'}`)
+    }
     await loadData()
     setGenerating(null)
   }
