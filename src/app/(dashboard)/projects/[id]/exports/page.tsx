@@ -39,6 +39,7 @@ export default function ExportsPage() {
   const [fontPreset, setFontPreset] = useState<FontPresetKey>(DEFAULT_FONT_PRESET)
   const [trimKey, setTrimKey] = useState<string>(DEFAULT_TRIM)
   const [format, setFormat] = useState<'pdf' | 'md'>('pdf')
+  const [lastUrl, setLastUrl] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.from('book_projects').select('*').eq('id', projectId).single().then(({ data }) => {
@@ -63,6 +64,7 @@ export default function ExportsPage() {
   const handleExport = async () => {
     setExporting(true)
     setError('')
+    setLastUrl(null)
     const res = await fetch(`/api/projects/${projectId}/export`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -75,6 +77,11 @@ export default function ExportsPage() {
       return
     }
     setExporting(false)
+    if (data.url) {
+      setLastUrl(data.url)
+      // auto-open the PDF in a new tab
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+    }
     await refreshJobs()
   }
 
@@ -180,6 +187,23 @@ export default function ExportsPage() {
         )}
 
         {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</div>}
+
+        {lastUrl && (
+          <div className="flex items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-green-900">Your {format.toUpperCase()} is ready</p>
+                <p className="text-xs text-green-700">If it didn&apos;t open automatically, click below.</p>
+              </div>
+            </div>
+            <a href={lastUrl} target="_blank" rel="noopener noreferrer" download>
+              <Button className="gap-1.5 bg-green-600 hover:bg-green-700">
+                <Download className="h-4 w-4" /> Open / Download
+              </Button>
+            </a>
+          </div>
+        )}
 
         <div className="flex justify-end">
           <Button onClick={handleExport} loading={exporting} className="gap-1.5">
