@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ProjectSidebar } from '@/components/layout/sidebar'
@@ -123,6 +123,7 @@ export default function ExportsPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [logoUploading, setLogoUploading] = useState(false)
   const [includeLogo, setIncludeLogo] = useState(true)
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const [chapterCount, setChapterCount] = useState(0)
 
   // Print-ready cover upgrade state
@@ -495,43 +496,44 @@ export default function ExportsPage() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) handleLogoUpload(f)
+                      e.target.value = ''
+                    }}
+                  />
                   {logoUrl ? (
                     <div className="flex gap-2">
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0]
-                            if (f) handleLogoUpload(f)
-                            e.target.value = ''
-                          }}
-                        />
-                        <Button variant="outline" size="sm" className="gap-1.5" loading={logoUploading} asChild={false}>
-                          <span className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Replace</span>
-                        </Button>
-                      </label>
-                      <Button variant="outline" size="sm" onClick={handleLogoDelete} className="gap-1.5 text-red-600">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        loading={logoUploading}
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        <Upload className="h-3.5 w-3.5" /> Replace
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={handleLogoDelete} className="gap-1.5 text-red-600">
                         <Trash2 className="h-3.5 w-3.5" /> Remove
                       </Button>
                     </div>
                   ) : (
-                    <label className="cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0]
-                          if (f) handleLogoUpload(f)
-                          e.target.value = ''
-                        }}
-                      />
-                      <Button variant="outline" size="sm" className="gap-1.5" loading={logoUploading} asChild={false}>
-                        <span className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Upload logo</span>
-                      </Button>
-                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      loading={logoUploading}
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      <Upload className="h-3.5 w-3.5" /> Upload logo
+                    </Button>
                   )}
                   <p className="text-xs text-gray-400 mt-1.5">PNG, JPEG, WebP, or SVG. Max 5 MB. Transparent PNG recommended.</p>
                 </div>
