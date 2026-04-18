@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const imageBuffer = await generateBookCoverImage(imagePrompt)
 
     // Step 3: Upload to Supabase Storage under the user's project folder
-    const admin = createAdminClient()
+    const admin = await createAdminClient()
     const objectPath = `${user.id}/${projectId}/${Date.now()}.png`
     const { error: uploadError } = await admin.storage
       .from(COVERS_BUCKET)
