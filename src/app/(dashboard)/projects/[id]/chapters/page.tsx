@@ -23,6 +23,9 @@ export default function ChaptersPage() {
   const [editing, setEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
   const [saving, setSaving] = useState(false)
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; current: string } | null>(null)
+  const [bulkStopRequested, setBulkStopRequested] = useState(false)
 
   const loadData = useCallback(async () => {
     const [{ data: proj }, { data: outl }, { data: chaps }] = await Promise.all([
@@ -64,6 +67,57 @@ export default function ChaptersPage() {
     setGenerating(null)
   }
 
+  const handleGenerateAll = async () => {
+    if (!structure) return
+    setBulkStopRequested(false)
+    setBulkRunning(true)
+
+    // Re-fetch fresh state so we know exactly what's missing right now
+    const { data: freshChaps } = await supabase.from('book_chapters').select('chapter_number').eq('project_id', projectId)
+    const existingSet = new Set((freshChaps ?? []).map((c) => c.chapter_number))
+    const todo = structure.chapters.filter((c) => !existingSet.has(c.number))
+
+    if (todo.length === 0) {
+      setBulkRunning(false)
+      setBulkProgress(null)
+      alert('All chapters are already generated. Use Regenerate on individual chapters to rewrite them.')
+      return
+    }
+
+    let done = 0
+    for (const ch of todo) {
+      if (bulkStopRequested) break
+      setBulkProgress({ done, total: todo.length, current: `Chapter ${ch.number}: ${ch.title}` })
+
+      // Get the fresh previous chapter summary from the live state
+      const { data: prev } = await supabase
+        .from('book_chapters').select('summary').eq('project_id', projectId).eq('chapter_number', ch.number - 1).maybeSingle()
+
+      try {
+        const res = await fetch(`/api/projects/${projectId}/generate-chapter`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chapterOutline: ch, previousSummary: prev?.summary ?? '' }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: res.statusText }))
+          const stop = confirm(`Chapter ${ch.number} failed: ${err.error ?? res.statusText}\n\nOK = continue with remaining chapters, Cancel = stop bulk generation.`)
+          if (!stop) break
+        }
+      } catch (e) {
+        const stop = confirm(`Chapter ${ch.number} network error: ${e instanceof Error ? e.message : 'unknown'}\n\nOK = continue, Cancel = stop.`)
+        if (!stop) break
+      }
+      done += 1
+      setBulkProgress({ done, total: todo.length, current: done < todo.length ? `Next: chapter ${todo[done].number}` : 'Finishing…' })
+      await loadData()
+    }
+
+    setBulkRunning(false)
+    setBulkProgress(null)
+    await loadData()
+  }
+
   const currentChapterData = chapters.find((c) => c.chapter_number === selectedChapter)
   const currentChapterOutline = structure?.chapters.find((c) => c.number === selectedChapter)
 
@@ -92,7 +146,45 @@ export default function ChaptersPage() {
       <ProjectSidebar projectId={projectId} projectStatus={project.status} />
       <div className="flex-1 flex gap-4">
         <div className="w-52 shrink-0">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">Chapters</h2>
+          <div className="mb-3 space-y-2">
+            <h2 className="text-sm font-semibold text-gray-700">Chapters</h2>
+            {(() => {
+              const remaining = structure.chapters.filter((c) => !chapters.some((ch) => ch.chapter_number === c.number)).length
+              if (remaining === 0 && !bulkRunning) {
+                return <p className="text-xs text-green-600 font-medium">All {structure.chapters.length} chapters written</p>
+              }
+              return (
+                <>
+                  {!bulkRunning ? (
+                    <Button size="sm" className="w-full gap-1.5" onClick={handleGenerateAll}>
+                      <RefreshCw className="h-3.5 w-3.5" /> Generate All ({remaining})
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <Spinner size="sm" />
+                        <p className="text-xs font-medium text-indigo-900">
+                          {bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting…'}
+                        </p>
+                      </div>
+                      {bulkProgress && (
+                        <>
+                          <div className="h-1 bg-indigo-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-600 transition-all" style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
+                          </div>
+                          <p className="text-[10px] text-indigo-700 truncate">{bulkProgress.current}</p>
+                        </>
+                      )}
+                      <button onClick={() => setBulkStopRequested(true)} className="text-[11px] text-indigo-700 hover:underline w-full text-left">
+                        Stop after current
+                      </button>
+                      <p className="text-[10px] text-gray-500 leading-tight">Keep this tab open. Progress saves as each chapter finishes.</p>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
           <div className="space-y-1">
             {structure.chapters.map((ch) => {
               const written = chapters.find((c) => c.chapter_number === ch.number)
