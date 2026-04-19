@@ -262,41 +262,44 @@ export default function CoverPage() {
           <div className="flex items-center justify-center py-20">
             <div className="text-center"><Spinner size="lg" className="mx-auto mb-3" /><p className="text-gray-500">Generating 3 cover variants…</p></div>
           </div>
-        ) : candidates.length > 1 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-700">Pick your favorite</h2>
-              <p className="text-xs text-gray-500">Click a variant to make it your cover. The title and author will be overlaid as real text at export time.</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {candidates.map((c) => {
-                const isSelected = cover?.id === c.id
-                const isLoading = selecting === c.id
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => handleSelect(c.id)}
-                    className={`relative rounded-lg overflow-hidden border-4 transition-all ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-transparent hover:border-gray-300'}`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={c.public_url ?? ''} alt="Cover variant" className="w-full aspect-[3/4] object-cover" />
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 bg-indigo-600 text-white rounded-full p-1 shadow-lg">
-                        <CheckCircle2 className="h-4 w-4" />
-                      </div>
-                    )}
-                    {isLoading && (
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                        <Spinner size="sm" />
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        ) : cover ? (
+        ) : (
+          <>
+            {candidates.length > 1 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-700">Pick your favorite</h2>
+                  <p className="text-xs text-gray-500">Click a variant to make it your cover. The title and author will be overlaid as real text at export time.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {candidates.map((c) => {
+                    const isSelected = cover?.id === c.id
+                    const isLoading = selecting === c.id
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleSelect(c.id)}
+                        className={`relative rounded-lg overflow-hidden border-4 transition-all ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-transparent hover:border-gray-300'}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={c.public_url ?? ''} alt="Cover variant" className="w-full aspect-[3/4] object-cover" />
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 bg-indigo-600 text-white rounded-full p-1 shadow-lg">
+                            <CheckCircle2 className="h-4 w-4" />
+                          </div>
+                        )}
+                        {isLoading && (
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <Spinner size="sm" />
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            {cover ? (
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
             {(() => {
               const meta = (cover.metadata as Record<string, unknown> | null) ?? {}
@@ -620,6 +623,8 @@ export default function CoverPage() {
             <h3 className="font-semibold text-gray-900 mb-1">No cover yet</h3>
             <p className="text-sm text-gray-500">Pick a mode above and click Generate, or upload your own.</p>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
