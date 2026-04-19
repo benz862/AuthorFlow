@@ -299,20 +299,22 @@ export default function ExportsPage() {
     }
 
     setExporting(true)
+    const payload = {
+      format,
+      fontPreset,
+      trimSize: trimKey,
+      textSize,
+      marginPreset,
+      exportMode,
+      sampleOptions: { includeChapters, purchaseUrl: purchaseUrl.trim(), ctaMessage: ctaMessage.trim() },
+      includeLogo,
+      coverQuality,
+    }
+    console.log('[export] submitting', payload)
     const res = await fetch(`/api/projects/${projectId}/export`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        format,
-        fontPreset,
-        trimSize: trimKey,
-        textSize,
-        marginPreset,
-        exportMode,
-        sampleOptions: { includeChapters, purchaseUrl: purchaseUrl.trim(), ctaMessage: ctaMessage.trim() },
-        includeLogo,
-        coverQuality,
-      }),
+      body: JSON.stringify(payload),
     })
     const data = await res.json()
     if (!res.ok) {
@@ -351,30 +353,39 @@ export default function ExportsPage() {
         </div>
 
         {/* Format */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
           <h2 className="text-sm font-semibold text-gray-700">Format</h2>
           <div className="flex gap-2">
             <button
+              type="button"
+              aria-pressed={format === 'pdf'}
               onClick={() => setFormat('pdf')}
-              className={`flex-1 flex items-center gap-3 rounded-lg border-2 px-4 py-3 transition-all text-left ${format === 'pdf' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
+              className={`flex-1 flex items-center gap-3 rounded-lg border-2 px-4 py-3 transition-all text-left ${format === 'pdf' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-gray-200 hover:border-gray-300'}`}
             >
               <FileType2 className="h-5 w-5 text-red-500 shrink-0" />
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-medium text-gray-900">PDF</p>
                 <p className="text-xs text-gray-500">Print-ready, with cover + TOC</p>
               </div>
+              {format === 'pdf' && <CheckCircle2 className="h-4 w-4 text-indigo-600 shrink-0" />}
             </button>
             <button
+              type="button"
+              aria-pressed={format === 'md'}
               onClick={() => setFormat('md')}
-              className={`flex-1 flex items-center gap-3 rounded-lg border-2 px-4 py-3 transition-all text-left ${format === 'md' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
+              className={`flex-1 flex items-center gap-3 rounded-lg border-2 px-4 py-3 transition-all text-left ${format === 'md' ? 'border-green-500 bg-green-50 ring-2 ring-green-200' : 'border-gray-200 hover:border-gray-300'}`}
             >
               <FileText className="h-5 w-5 text-green-500 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">Markdown</p>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">Markdown (.md)</p>
                 <p className="text-xs text-gray-500">Plain source text, for editing</p>
               </div>
+              {format === 'md' && <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />}
             </button>
           </div>
+          <p className="text-xs text-gray-500">
+            Selected: <span className={`font-semibold ${format === 'md' ? 'text-green-700' : 'text-indigo-700'}`}>{format === 'md' ? 'Markdown (.md)' : 'PDF'}</span>
+          </p>
         </div>
 
         {format === 'pdf' && (
@@ -741,8 +752,12 @@ export default function ExportsPage() {
         )}
 
         <div className="flex justify-end">
-          <Button onClick={handleExport} loading={exporting} className="gap-1.5">
-            <Download className="h-4 w-4" /> {exporting ? 'Generating...' : `Generate ${format.toUpperCase()}`}
+          <Button
+            onClick={handleExport}
+            loading={exporting}
+            className={`gap-1.5 ${format === 'md' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+          >
+            <Download className="h-4 w-4" /> {exporting ? 'Generating...' : format === 'md' ? 'Generate Markdown (.md)' : 'Generate PDF'}
           </Button>
         </div>
 

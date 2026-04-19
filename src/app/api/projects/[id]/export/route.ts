@@ -20,7 +20,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = await request.json().catch(() => ({}))
-  const format: string = body?.format ?? 'pdf'
+  // Normalize format — accept 'md', 'markdown', '.md' as markdown; anything else falls back to pdf.
+  const rawFormat = String(body?.format ?? 'pdf').toLowerCase().trim()
+  const format: 'pdf' | 'md' = ['md', 'markdown', '.md', 'text'].includes(rawFormat) ? 'md' : 'pdf'
+  console.log('[export] request received', { rawFormat, normalized: format, projectId })
   const fontPresetKey: string | undefined = body?.fontPreset
   const trimKey: string | undefined = body?.trimSize
   const textSize: TextSizeKey = (body?.textSize as TextSizeKey) ?? 'normal'
@@ -86,7 +89,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         metadata: { format: 'markdown' },
       }).select().single()
 
-      await supabase.from('export_jobs').update({
+      await createAdminClient().from('export_jobs').update({
         status: 'completed',
         output_asset_id: asset?.id ?? null,
         finished_at: new Date().toISOString(),
@@ -106,7 +109,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .order('chapter_number', { ascending: true })
 
     if (!chapters || chapters.length === 0) {
-      await supabase.from('export_jobs').update({
+      await createAdminClient().from('export_jobs').update({
         status: 'failed',
         error_message: 'No chapters to export. Generate chapters first.',
         finished_at: new Date().toISOString(),
@@ -247,7 +250,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ job, asset, url: pub.publicUrl })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Export failed'
-    await supabase.from('export_jobs').update({
+    await createAdminClient().from('export_jobs').update({
       status: 'failed',
       error_message: message,
       finished_at: new Date().toISOString(),
