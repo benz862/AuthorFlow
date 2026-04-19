@@ -388,6 +388,8 @@ export default function ExportsPage() {
           </p>
         </div>
 
+        {format === 'md' && <MarkdownHelp />}
+
         {format === 'pdf' && (
           <>
             {/* Export mode: Full vs Sample */}
@@ -927,5 +929,113 @@ function TrimOption({
         <p className="text-xs text-gray-500">{trim.description}</p>
       </div>
     </button>
+  )
+}
+
+function MarkdownHelp() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-gray-50 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          <FileText className="h-5 w-5 text-green-600 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">What do the symbols in the .md file mean?</p>
+            <p className="text-xs text-gray-500">Quick guide for importing into Affinity Publisher, InDesign, Word, or Scrivener.</p>
+          </div>
+        </div>
+        <span className="text-gray-400 text-sm">{open ? '−' : '+'}</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-gray-100 px-5 py-5 space-y-5 text-sm text-gray-700">
+          <section className="space-y-2">
+            <h3 className="font-semibold text-gray-900">What is Markdown?</h3>
+            <p>
+              Markdown is plain text with a few simple symbols that mark up structure (headings, bold, bullets).
+              It&apos;s the standard source format for books, blogs, and documentation. You can open <code className="bg-gray-100 px-1 rounded">.md</code> files
+              in any text editor, and most pro layout apps know how to import them.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-gray-900">The symbols, cheat-sheet style</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+              <CheatRow code="# Title" means="H1 heading — usually the book or chapter title" />
+              <CheatRow code="## Section" means="H2 heading — major section" />
+              <CheatRow code="### Subsection" means="H3 heading — minor section" />
+              <CheatRow code="**bold**" means="Bold text" />
+              <CheatRow code="*italic*" means="Italic text" />
+              <CheatRow code="- item" means="Bulleted list item" />
+              <CheatRow code="1. item" means="Numbered list item" />
+              <CheatRow code="> quote" means="Block quote / callout" />
+              <CheatRow code="---" means="Horizontal rule / section break" />
+              <CheatRow code="[text](url)" means="Hyperlink" />
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-gray-900">Affinity Publisher 2</h3>
+            <ol className="list-decimal pl-5 space-y-1">
+              <li>Open your document, choose the Text tool, and click where you want the manuscript to start.</li>
+              <li>Go to <strong>File → Place…</strong> and pick your <code className="bg-gray-100 px-1 rounded">.md</code> file.</li>
+              <li>Affinity imports it as plain text. Create a set of Paragraph Styles (Heading 1, Heading 2, Body, Quote, List).</li>
+              <li>Use <strong>Find &amp; Replace</strong> with Regex to apply styles: e.g. match <code className="bg-gray-100 px-1 rounded">^# (.+)$</code> and apply Heading 1 to the match group.</li>
+              <li>Repeat for <code className="bg-gray-100 px-1 rounded">## </code>, <code className="bg-gray-100 px-1 rounded">### </code>, <code className="bg-gray-100 px-1 rounded">**bold**</code>, <code className="bg-gray-100 px-1 rounded">*italic*</code>.</li>
+            </ol>
+            <p className="text-xs text-gray-500">Tip: Save your Paragraph Styles as a preset so you can reuse the workflow on future books.</p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-gray-900">Adobe InDesign</h3>
+            <p>InDesign doesn&apos;t import <code className="bg-gray-100 px-1 rounded">.md</code> natively. Two options:</p>
+            <ol className="list-decimal pl-5 space-y-1">
+              <li>
+                <strong>Convert to ICML first (recommended).</strong> Install <a className="text-indigo-600 underline" href="https://pandoc.org" target="_blank" rel="noopener noreferrer">Pandoc</a> and run:{' '}
+                <code className="bg-gray-100 px-1 rounded text-xs">pandoc book.md -o book.icml</code>. Then <strong>File → Place…</strong> the ICML file — all headings, lists, and emphasis come in as proper InDesign styles ready to map to your template.
+              </li>
+              <li>
+                <strong>Place the .md as plain text</strong> (File → Place), then use GREP Find/Change to convert the symbols to character &amp; paragraph styles. Slower but no extra tools needed.
+              </li>
+            </ol>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-gray-900">Microsoft Word / Pages</h3>
+            <p>
+              Drag the <code className="bg-gray-100 px-1 rounded">.md</code> file into Word and it will open as plain text. Easier path: convert with Pandoc to <code className="bg-gray-100 px-1 rounded">.docx</code> first:{' '}
+              <code className="bg-gray-100 px-1 rounded text-xs">pandoc book.md -o book.docx</code>. You get real Word headings, lists, bold/italic out of the box.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-gray-900">Scrivener</h3>
+            <p>
+              Scrivener imports Markdown directly: <strong>File → Import → Import and Split…</strong> Pick your <code className="bg-gray-100 px-1 rounded">.md</code> and set the split marker to <code className="bg-gray-100 px-1 rounded">#</code> to break each chapter into its own document.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-gray-900">Just want to read it?</h3>
+            <p>
+              Open the <code className="bg-gray-100 px-1 rounded">.md</code> file in <a className="text-indigo-600 underline" href="https://typora.io" target="_blank" rel="noopener noreferrer">Typora</a>, <a className="text-indigo-600 underline" href="https://obsidian.md" target="_blank" rel="noopener noreferrer">Obsidian</a>, or VS Code with a Markdown Preview extension — the symbols disappear and you see a properly formatted document.
+            </p>
+          </section>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CheatRow({ code, means }: { code: string; means: string }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <code className="font-mono text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded whitespace-nowrap shrink-0">{code}</code>
+      <span className="text-xs text-gray-600">{means}</span>
+    </div>
   )
 }
