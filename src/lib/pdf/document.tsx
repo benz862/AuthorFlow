@@ -46,6 +46,10 @@ export interface BookPdfProps {
   subtitle?: string | null
   authorName: string
   coverImageBuffer?: Buffer | null // optional cover PNG bytes
+  /** When true, overlay title/subtitle/author text on top of the cover artwork.
+   *  Defaults to true for AI-generated covers. User-uploaded covers usually
+   *  already have text baked in, so they pass false. */
+  overlayCoverText?: boolean
   chapters: Array<{
     number: number
     title: string
@@ -494,22 +498,26 @@ export function BookPdf(props: BookPdfProps) {
       title={isSample ? `${props.title} — Sample` : props.title}
       author={props.authorName}
     >
-      {/* Cover — artwork with title/subtitle/author overlaid */}
+      {/* Cover — artwork, with optional title/subtitle/author overlay */}
       {props.coverImageBuffer && (
         <Page size={pageSize} style={sheet.coverPage}>
           <Image src={props.coverImageBuffer} style={sheet.coverImage} />
-          {/* Scrims for legibility over any artwork */}
-          <View style={sheet.coverTextTopScrim} fixed />
-          <View style={sheet.coverTextBottomScrim} fixed />
-          <View style={sheet.coverTitleBox}>
-            <Text style={sheet.coverTitle}>{props.title}</Text>
-            {props.subtitle && (
-              <Text style={sheet.coverSubtitle}>{props.subtitle}</Text>
-            )}
-          </View>
-          <View style={sheet.coverAuthorBox}>
-            <Text style={sheet.coverAuthor}>{props.authorName.toUpperCase()}</Text>
-          </View>
+          {props.overlayCoverText !== false && (
+            <>
+              {/* Scrims for legibility over any artwork */}
+              <View style={sheet.coverTextTopScrim} fixed />
+              <View style={sheet.coverTextBottomScrim} fixed />
+              <View style={sheet.coverTitleBox}>
+                <Text style={sheet.coverTitle}>{props.title}</Text>
+                {props.subtitle && (
+                  <Text style={sheet.coverSubtitle}>{props.subtitle}</Text>
+                )}
+              </View>
+              <View style={sheet.coverAuthorBox}>
+                <Text style={sheet.coverAuthor}>{props.authorName.toUpperCase()}</Text>
+              </View>
+            </>
+          )}
         </Page>
       )}
 

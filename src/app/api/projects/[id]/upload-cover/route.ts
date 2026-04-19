@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     public_url: pub.publicUrl,
     mime_type: file.type,
     file_size_bytes: bytes.length,
-    metadata: { source: 'user_upload', originalName: file.name },
+    metadata: { source: 'user_upload', originalName: file.name, overlayTitle: false },
   }).select().single()
 
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })

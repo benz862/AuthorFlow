@@ -88,7 +88,7 @@ Return ONLY the expanded prompt, no preamble or JSON.`,
         public_url: publicUrlData.publicUrl,
         mime_type: 'image/png',
         file_size_bytes: buf.length,
-        metadata: { blurb, tagline, source, batchId, variantIndex: i + 1, variantCount: imageBuffers.length },
+        metadata: { blurb, tagline, source, batchId, variantIndex: i + 1, variantCount: imageBuffers.length, overlayTitle: true },
       }).select().single()
 
       if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })

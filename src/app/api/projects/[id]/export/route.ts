@@ -196,6 +196,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       authorName,
       coverImageBuffer: coverBuffer,
       logoImageBuffer: logoBuffer,
+      overlayCoverText: ((coverAsset?.metadata as Record<string, unknown> | null)?.overlayTitle ?? true) !== false,
       chapters: chapters.map((c) => ({
         number: c.chapter_number,
         title: c.title,

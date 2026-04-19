@@ -100,6 +100,23 @@ export default function CoverPage() {
     setSelecting(null)
   }
 
+  const handleToggleOverlay = async (next: boolean) => {
+    if (!cover) return
+    // Optimistic update
+    const prev = cover
+    setCover({ ...cover, metadata: { ...(cover.metadata as object ?? {}), overlayTitle: next } as never })
+    const res = await fetch(`/api/projects/${projectId}/cover-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assetId: cover.id, overlayTitle: next }),
+    })
+    if (!res.ok) {
+      setCover(prev)
+      const data = await res.json().catch(() => ({}))
+      setError(data.error ?? 'Failed to update cover setting')
+    }
+  }
+
   const handleUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) { setError('Please upload an image file (PNG/JPG/WebP).'); return }
     if (file.size > 20 * 1024 * 1024) { setError('Image must be under 20 MB.'); return }
@@ -242,6 +259,29 @@ export default function CoverPage() {
                 <img src={cover.public_url ?? ''} alt="Book cover" className="w-full" />
               </div>
             </div>
+
+            {/* Title overlay toggle */}
+            {(() => {
+              const meta = (cover.metadata as Record<string, unknown> | null) ?? {}
+              const overlay = meta.overlayTitle !== false // default true
+              return (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Overlay title & author on cover</p>
+                    <p className="text-xs text-gray-500">Turn off if your cover already has the title and author baked in.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleOverlay(!overlay)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${overlay ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                    aria-pressed={overlay}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${overlay ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              )
+            })()}
+
             {cover.public_url && (
               <div className="flex justify-center">
                 <a href={cover.public_url} download>
