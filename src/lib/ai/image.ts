@@ -11,20 +11,31 @@ const IMAGE_MODEL = process.env.GOOGLE_IMAGE_MODEL ?? 'imagen-4.0-generate-previ
  * Returns a Buffer of PNG bytes — caller is responsible for storing it.
  */
 export async function generateBookCoverImage(prompt: string): Promise<Buffer> {
+  const [buf] = await generateBookCoverImages(prompt, 1)
+  return buf
+}
+
+/**
+ * Multi-variant cover generation. Imagen supports numberOfImages up to 4.
+ * Returns an array of PNG Buffers. Caller stores each and lets the user pick.
+ */
+export async function generateBookCoverImages(prompt: string, n: number = 3): Promise<Buffer[]> {
+  const count = Math.max(1, Math.min(4, Math.floor(n)))
   const response = await genai.models.generateImages({
     model: IMAGE_MODEL,
     prompt,
     config: {
-      numberOfImages: 1,
-      aspectRatio: '3:4', // portrait, book cover proportions
+      numberOfImages: count,
+      aspectRatio: '3:4',
     },
   })
 
-  const image = response.generatedImages?.[0]?.image
-  if (!image?.imageBytes) {
-    throw new Error('Imagen did not return image bytes')
-  }
+  const images = response.generatedImages ?? []
+  if (images.length === 0) throw new Error('Imagen did not return any images')
 
-  // imageBytes is base64-encoded
-  return Buffer.from(image.imageBytes, 'base64')
+  return images.map((img, idx) => {
+    const bytes = img?.image?.imageBytes
+    if (!bytes) throw new Error(`Imagen variant ${idx + 1} missing image bytes`)
+    return Buffer.from(bytes, 'base64')
+  })
 }

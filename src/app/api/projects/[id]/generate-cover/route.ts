@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { checkEntitlement } from '@/lib/entitlements/service'
 import { generateCoverConcept } from '@/lib/ai/chapters'
-import { generateBookCoverImage } from '@/lib/ai/image'
+import { generateBookCoverImages } from '@/lib/ai/image'
 import { generateText } from '@/lib/ai/client'
 
 const COVERS_BUCKET = 'book-covers'
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const body = await request.json().catch(() => ({}))
   const customPrompt: string | undefined = body?.customPrompt?.trim() || undefined
   const enhance: boolean = !!body?.enhance
+  const variantCount: number = Math.max(1, Math.min(4, Number(body?.variants ?? 3)))
 
   try {
     let imagePrompt: string
@@ -59,37 +60,47 @@ Return ONLY the expanded prompt, no preamble or JSON.`,
       tagline = concept.tagline
     }
 
-    // Imagen renders the image
-    const imageBuffer = await generateBookCoverImage(imagePrompt)
+    // Imagen renders N variants in one call
+    const imageBuffers = await generateBookCoverImages(imagePrompt, variantCount)
 
-    // Upload to Supabase Storage
+    // Upload each variant and insert as 'cover_candidate' assets
     const admin = createAdminClient()
-    const objectPath = `${user.id}/${projectId}/${Date.now()}.png`
-    const { error: uploadError } = await admin.storage
-      .from(COVERS_BUCKET)
-      .upload(objectPath, imageBuffer, { contentType: 'image/png', upsert: true })
+    const batchId = `${Date.now()}`
+    const source = customPrompt ? (enhance ? 'user_enhanced' : 'user_custom') : 'auto'
+    const candidates: Array<Record<string, unknown>> = []
 
-    if (uploadError) {
-      return NextResponse.json({ error: `Storage upload failed: ${uploadError.message}. Make sure the '${COVERS_BUCKET}' bucket exists and is public.` }, { status: 500 })
+    for (let i = 0; i < imageBuffers.length; i++) {
+      const buf = imageBuffers[i]
+      const objectPath = `${user.id}/${projectId}/${batchId}_v${i + 1}.png`
+      const { error: uploadError } = await admin.storage
+        .from(COVERS_BUCKET)
+        .upload(objectPath, buf, { contentType: 'image/png', upsert: true })
+      if (uploadError) {
+        return NextResponse.json({ error: `Storage upload failed: ${uploadError.message}. Make sure the '${COVERS_BUCKET}' bucket exists and is public.` }, { status: 500 })
+      }
+      const { data: publicUrlData } = admin.storage.from(COVERS_BUCKET).getPublicUrl(objectPath)
+
+      const { data: asset, error: insertError } = await supabase.from('book_assets').insert({
+        project_id: projectId,
+        asset_type: imageBuffers.length === 1 ? 'cover' : 'cover_candidate',
+        generation_prompt: imagePrompt,
+        storage_path: objectPath,
+        public_url: publicUrlData.publicUrl,
+        mime_type: 'image/png',
+        file_size_bytes: buf.length,
+        metadata: { blurb, tagline, source, batchId, variantIndex: i + 1, variantCount: imageBuffers.length },
+      }).select().single()
+
+      if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+      candidates.push(asset as Record<string, unknown>)
     }
 
-    const { data: publicUrlData } = admin.storage.from(COVERS_BUCKET).getPublicUrl(objectPath)
-    const publicUrl = publicUrlData.publicUrl
-
-    const { data: asset, error: insertError } = await supabase.from('book_assets').insert({
-      project_id: projectId,
-      asset_type: 'cover',
-      generation_prompt: imagePrompt,
-      storage_path: objectPath,
-      public_url: publicUrl,
-      mime_type: 'image/png',
-      file_size_bytes: imageBuffer.length,
-      metadata: { blurb, tagline, source: customPrompt ? (enhance ? 'user_enhanced' : 'user_custom') : 'auto' },
-    }).select().single()
-
-    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
-
-    return NextResponse.json({ asset })
+    // Return the full set. Frontend shows thumbnails and posts to /select-cover to promote one.
+    return NextResponse.json({
+      candidates,
+      asset: candidates[0], // back-compat for any legacy caller
+      batchId,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to generate cover'
     return NextResponse.json({ error: message }, { status: 500 })
