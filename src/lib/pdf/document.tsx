@@ -210,11 +210,65 @@ function buildStyles(
     coverPage: {
       padding: 0,
       margin: 0,
+      position: 'relative',
     },
     coverImage: {
       width: '100%',
       height: '100%',
       objectFit: 'cover',
+    },
+    coverTextTopScrim: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: '28%',
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    coverTextBottomScrim: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: '18%',
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    coverTitleBox: {
+      position: 'absolute',
+      top: '6%',
+      left: '8%',
+      right: '8%',
+      alignItems: 'center',
+    },
+    coverTitle: {
+      fontFamily: headFamily,
+      fontSize: 40,
+      fontWeight: 'bold',
+      color: '#ffffff',
+      textAlign: 'center',
+      letterSpacing: 0.5,
+      marginBottom: 10,
+    },
+    coverSubtitle: {
+      fontFamily: headFamily,
+      fontSize: 16,
+      color: '#f3f4f6',
+      textAlign: 'center',
+      fontStyle: 'italic',
+    },
+    coverAuthorBox: {
+      position: 'absolute',
+      bottom: '5%',
+      left: '8%',
+      right: '8%',
+      alignItems: 'center',
+    },
+    coverAuthor: {
+      fontFamily: headFamily,
+      fontSize: 18,
+      color: '#ffffff',
+      textAlign: 'center',
+      letterSpacing: 1,
     },
     titlePage: {
       paddingTop: '30%',
@@ -440,10 +494,22 @@ export function BookPdf(props: BookPdfProps) {
       title={isSample ? `${props.title} — Sample` : props.title}
       author={props.authorName}
     >
-      {/* Cover */}
+      {/* Cover — artwork with title/subtitle/author overlaid */}
       {props.coverImageBuffer && (
         <Page size={pageSize} style={sheet.coverPage}>
           <Image src={props.coverImageBuffer} style={sheet.coverImage} />
+          {/* Scrims for legibility over any artwork */}
+          <View style={sheet.coverTextTopScrim} fixed />
+          <View style={sheet.coverTextBottomScrim} fixed />
+          <View style={sheet.coverTitleBox}>
+            <Text style={sheet.coverTitle}>{props.title}</Text>
+            {props.subtitle && (
+              <Text style={sheet.coverSubtitle}>{props.subtitle}</Text>
+            )}
+          </View>
+          <View style={sheet.coverAuthorBox}>
+            <Text style={sheet.coverAuthor}>{props.authorName.toUpperCase()}</Text>
+          </View>
         </Page>
       )}
 
