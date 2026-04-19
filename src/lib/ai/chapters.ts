@@ -1,32 +1,54 @@
 import { generateText } from './client'
 import { BookProject, BookChapter } from '@/lib/types/database'
-import { OutlineChapter } from '@/lib/types/app'
+import { OutlineChapter, BookCategory } from '@/lib/types/app'
 
 const SYSTEM_PROMPT = `You are a professional ghostwriter and book author with expertise across many genres and topics.
 Your writing is engaging, clear, and well-structured. You adapt your style to match the specified tone and audience.
 Write complete, polished chapters that deliver real value to readers.`
 
 export async function generateChapter(
-  project: Pick<BookProject, 'title' | 'book_type' | 'tone' | 'audience' | 'reading_level' | 'factual_mode'>,
+  project: Pick<BookProject, 'title' | 'book_type' | 'tone' | 'audience' | 'reading_level' | 'factual_mode' | 'category'>,
   chapter: OutlineChapter,
   previousChapterSummary: string,
   researchContext: string,
   intakeSummary: string
 ): Promise<{ content: string; wordCount: number }> {
-  const targetWords = chapter.estimatedWords ?? 2000
+  // Category-aware default — freebies should never default to 2000 words.
+  const defaultByCategory: Record<BookCategory, number> = {
+    freebie: 700,
+    short: 1500,
+    medium: 2000,
+    long: 2500,
+  }
+  const category = (project.category as BookCategory) ?? 'medium'
+  const targetWords = chapter.estimatedWords ?? defaultByCategory[category]
+  const maxWords = Math.round(targetWords * 1.15) // hard cap, 15% tolerance
+
+  const isFreebie = category === 'freebie'
+  const freebieFraming = isFreebie
+    ? `
+IMPORTANT — THIS IS A LEAD MAGNET / FREEBIE:
+- The book is a short giveaway meant to build trust and entice the reader to buy the author's paid offer.
+- Be punchy, high-energy, and valuable — but DO NOT try to teach everything.
+- Tease depth. Surface the problem vividly. Deliver one concrete win. Leave the reader wanting more.
+- NO exhaustive reference lists. NO glossaries. NO filler. NO "in this chapter we will cover" preambles.
+- HARD WORD LIMIT: ${targetWords} words target, ${maxWords} absolute maximum. Do not exceed.
+`
+    : ''
 
   const prompt = `
 You are writing Chapter ${chapter.number}: "${chapter.title}" for the book "${project.title}".
 
 Book Context:
 - Type: ${project.book_type}
+- Category: ${category}
 - Tone: ${project.tone}
 - Audience: ${project.audience}
 - Reading Level: ${project.reading_level}
 - Factual Mode: ${project.factual_mode}
 - Chapter Intent: ${chapter.summary}
-- Target Length: approximately ${targetWords} words
-
+- Target Length: approximately ${targetWords} words${isFreebie ? ` (HARD MAX: ${maxWords} words)` : ''}
+${freebieFraming}
 Previous Chapter Summary:
 ${previousChapterSummary || 'This is the first chapter.'}
 
