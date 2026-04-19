@@ -69,6 +69,14 @@ export interface BookPdfProps {
   logoSizePct?: number
   /** Logo opacity 0.1–1. Default 1. */
   logoOpacity?: number
+  /** Cover text formatting */
+  coverTextColor?: string       // hex, default '#ffffff'
+  coverScrimOpacity?: number    // 0..0.8, default 0.45
+  coverTitleSize?: number       // 16..72 pt, default 40
+  coverTitleVPos?: 'top' | 'middle' | 'bottom'  // default 'top'
+  coverSubtitleSize?: number    // 10..40 pt, default 16
+  coverAuthorSize?: number      // 10..36 pt, default 18
+  coverAuthorVPos?: 'top' | 'middle' | 'bottom' // default 'bottom'
   exportMode?: ExportMode
   sampleOptions?: SampleOptions
   /** Total chapters in the FULL book — used on the CTA page copy. */
@@ -228,52 +236,6 @@ function buildStyles(
       width: '100%',
       height: '100%',
       objectFit: 'cover',
-    },
-    coverTextTopScrim: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: '28%',
-      backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-    coverTextBottomScrim: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: '18%',
-      backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-    coverTitleBox: {
-      position: 'absolute',
-      top: '6%',
-      left: '8%',
-      right: '8%',
-      alignItems: 'center',
-    },
-    coverTitle: {
-      fontFamily: headFamily,
-      fontSize: 40,
-      fontWeight: 'bold',
-      color: '#ffffff',
-      textAlign: 'center',
-      letterSpacing: 0.5,
-      marginBottom: 10,
-    },
-    coverSubtitle: {
-      fontFamily: headFamily,
-      fontSize: 16,
-      color: '#f3f4f6',
-      textAlign: 'center',
-      fontStyle: 'italic',
-    },
-    coverAuthorBox: {
-      position: 'absolute',
-      bottom: '5%',
-      left: '8%',
-      right: '8%',
-      alignItems: 'center',
     },
     coverAuthor: {
       fontFamily: headFamily,
@@ -480,6 +442,82 @@ function buildStyles(
 }
 
 /**
+ * Compute dynamic cover overlay styles (scrims, title box, author box, text).
+ * All return values are inline style objects for react-pdf.
+ */
+function coverOverlayStyles(opts: {
+  color: string
+  scrimOpacity: number
+  titleSize: number
+  titleVPos: 'top' | 'middle' | 'bottom'
+  subtitleSize: number
+  authorSize: number
+  authorVPos: 'top' | 'middle' | 'bottom'
+  headFamily: string
+}) {
+  const { color, scrimOpacity, titleSize, titleVPos, subtitleSize, authorSize, authorVPos, headFamily } = opts
+  const scrim = `rgba(0,0,0,${Math.max(0, Math.min(0.8, scrimOpacity))})`
+
+  const titleTop =
+    titleVPos === 'top' ? '6%' : titleVPos === 'middle' ? '40%' : '70%'
+
+  const authorBox: Record<string, string | number> =
+    authorVPos === 'top'
+      ? { position: 'absolute', top: '5%', left: '8%', right: '8%' }
+      : authorVPos === 'middle'
+      ? { position: 'absolute', top: '50%', left: '8%', right: '8%', transform: 'translateY(-50%)' }
+      : { position: 'absolute', bottom: '5%', left: '8%', right: '8%' }
+
+  return {
+    topScrim: {
+      position: 'absolute' as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      height: '30%',
+      backgroundColor: scrim,
+    },
+    bottomScrim: {
+      position: 'absolute' as const,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: '22%',
+      backgroundColor: scrim,
+    },
+    titleBox: {
+      position: 'absolute' as const,
+      top: titleTop,
+      left: '8%',
+      right: '8%',
+    },
+    title: {
+      fontFamily: headFamily,
+      fontSize: titleSize,
+      fontWeight: 'bold' as const,
+      color,
+      textAlign: 'center' as const,
+      marginBottom: 10,
+    },
+    subtitle: {
+      fontFamily: headFamily,
+      fontSize: subtitleSize,
+      color,
+      textAlign: 'center' as const,
+      opacity: 0.92,
+    },
+    authorBox,
+    author: {
+      fontFamily: headFamily,
+      fontSize: authorSize,
+      color,
+      textAlign: 'center' as const,
+      letterSpacing: 1,
+    },
+  }
+}
+
+/**
  * Compute an absolute-position style for the cover logo.
  * `position` is a nine-grid key (tl, tc, tr, cl, center, cr, bl, bc, br).
  * `sizePct` is width as a percentage of the cover width.
@@ -518,6 +556,17 @@ export function BookPdf(props: BookPdfProps) {
   const pageSize = trimToPoints(props.trim)
   const year = props.copyrightYear ?? new Date().getFullYear()
 
+  const cover = coverOverlayStyles({
+    color: props.coverTextColor ?? '#ffffff',
+    scrimOpacity: props.coverScrimOpacity ?? 0.45,
+    titleSize: props.coverTitleSize ?? 40,
+    titleVPos: props.coverTitleVPos ?? 'top',
+    subtitleSize: props.coverSubtitleSize ?? 16,
+    authorSize: props.coverAuthorSize ?? 18,
+    authorVPos: props.coverAuthorVPos ?? 'bottom',
+    headFamily: props.preset.heading.family,
+  })
+
   const isSample = props.exportMode === 'sample'
   const includeCount = Math.max(1, props.sampleOptions?.includeChapters ?? 1)
   const totalChapters = props.totalChapterCount ?? props.chapters.length
@@ -541,16 +590,16 @@ export function BookPdf(props: BookPdfProps) {
           {props.overlayCoverText !== false && (
             <>
               {/* Scrims for legibility over any artwork */}
-              <View style={sheet.coverTextTopScrim} fixed />
-              <View style={sheet.coverTextBottomScrim} fixed />
-              <View style={sheet.coverTitleBox}>
-                <Text style={sheet.coverTitle}>{props.title}</Text>
+              <View style={cover.topScrim} fixed />
+              <View style={cover.bottomScrim} fixed />
+              <View style={cover.titleBox}>
+                <Text style={cover.title}>{props.title}</Text>
                 {props.subtitle && (
-                  <Text style={sheet.coverSubtitle}>{props.subtitle}</Text>
+                  <Text style={cover.subtitle}>{props.subtitle}</Text>
                 )}
               </View>
-              <View style={sheet.coverAuthorBox}>
-                <Text style={sheet.coverAuthor}>{props.authorName.toUpperCase()}</Text>
+              <View style={cover.authorBox}>
+                <Text style={cover.author}>{props.authorName.toUpperCase()}</Text>
               </View>
             </>
           )}

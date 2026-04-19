@@ -305,6 +305,20 @@ export default function CoverPage() {
               const logoPosition = (meta.logoPosition as LogoPos) ?? 'br'
               const logoSizePct = typeof meta.logoSizePct === 'number' ? meta.logoSizePct : 18
               const logoOpacity = typeof meta.logoOpacity === 'number' ? meta.logoOpacity : 1
+              const textColor = typeof meta.textColor === 'string' ? meta.textColor : '#ffffff'
+              const scrimOpacity = typeof meta.scrimOpacity === 'number' ? meta.scrimOpacity : 0.45
+              const titleSize = typeof meta.titleSize === 'number' ? meta.titleSize : 40
+              const titleVPos = (meta.titleVPos as 'top' | 'middle' | 'bottom') ?? 'top'
+              const authorSize = typeof meta.authorSize === 'number' ? meta.authorSize : 18
+              const authorVPos = (meta.authorVPos as 'top' | 'middle' | 'bottom') ?? 'bottom'
+              const titleTopCss = titleVPos === 'top' ? '6%' : titleVPos === 'middle' ? '40%' : '70%'
+              const authorPosCss: React.CSSProperties =
+                authorVPos === 'top'
+                  ? { top: '5%', left: '8%', right: '8%' }
+                  : authorVPos === 'middle'
+                    ? { top: '50%', left: '8%', right: '8%', transform: 'translateY(-50%)' }
+                    : { bottom: '5%', left: '8%', right: '8%' }
+              const PRESET_COLORS = ['#ffffff', '#000000', '#facc15', '#f97316', '#ef4444', '#22c55e', '#3b82f6', '#a855f7']
 
               return (
                 <>
@@ -313,6 +327,21 @@ export default function CoverPage() {
                     <div className="relative w-64 shadow-2xl rounded-lg overflow-hidden" style={{ aspectRatio: '3 / 4' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={cover.public_url ?? ''} alt="Book cover" className="w-full h-full object-cover" />
+                      {overlay && (
+                        <>
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '30%', background: `rgba(0,0,0,${scrimOpacity})` }} />
+                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '22%', background: `rgba(0,0,0,${scrimOpacity})` }} />
+                          <div style={{ position: 'absolute', top: titleTopCss, left: '8%', right: '8%', textAlign: 'center', color: textColor }}>
+                            <div style={{ fontSize: `${titleSize * 0.32}px`, fontWeight: 700, lineHeight: 1.1, marginBottom: 6 }}>{project.title}</div>
+                            {project.subtitle && (
+                              <div style={{ fontSize: '11px', opacity: 0.92 }}>{project.subtitle}</div>
+                            )}
+                          </div>
+                          <div style={{ position: 'absolute', textAlign: 'center', color: textColor, letterSpacing: 1, fontSize: `${authorSize * 0.6}px`, ...authorPosCss }}>
+                            AUTHOR
+                          </div>
+                        </>
+                      )}
                       {logo && logoOnCover && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -344,6 +373,126 @@ export default function CoverPage() {
                       <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${overlay ? 'translate-x-5' : 'translate-x-0.5'}`} />
                     </button>
                   </div>
+
+                  {/* Text styling */}
+                  {overlay && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">Text styling</p>
+                        <p className="text-xs text-gray-500">Color, size, and position of the title and author on the cover.</p>
+                      </div>
+
+                      {/* Color */}
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-1.5">Text color</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {PRESET_COLORS.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => patchCover({ textColor: c })}
+                              className={`h-7 w-7 rounded-full border-2 ${textColor.toLowerCase() === c ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-gray-300'}`}
+                              style={{ backgroundColor: c }}
+                              title={c}
+                            />
+                          ))}
+                          <input
+                            type="color"
+                            value={textColor}
+                            onChange={(e) => patchCover({ textColor: e.target.value })}
+                            className="h-7 w-10 rounded border border-gray-300 cursor-pointer"
+                            title="Custom color"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Scrim opacity */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-medium text-gray-600">Scrim darkness</p>
+                          <span className="text-xs text-gray-500">{Math.round(scrimOpacity * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={0.8}
+                          step={0.05}
+                          value={scrimOpacity}
+                          onChange={(e) => patchCover({ scrimOpacity: Number(e.target.value) })}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Dark bands behind the title/author for legibility over busy artwork.</p>
+                      </div>
+
+                      {/* Title size */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-medium text-gray-600">Title size</p>
+                          <span className="text-xs text-gray-500">{titleSize} pt</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={16}
+                          max={72}
+                          step={1}
+                          value={titleSize}
+                          onChange={(e) => patchCover({ titleSize: Number(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Title vertical position */}
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-1.5">Title vertical position</p>
+                        <div className="grid grid-cols-3 gap-1">
+                          {(['top', 'middle', 'bottom'] as const).map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => patchCover({ titleVPos: p })}
+                              className={`rounded border-2 px-2 py-1.5 text-xs capitalize transition-all ${titleVPos === p ? 'border-indigo-500 bg-indigo-100 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Author size */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-medium text-gray-600">Author size</p>
+                          <span className="text-xs text-gray-500">{authorSize} pt</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={10}
+                          max={36}
+                          step={1}
+                          value={authorSize}
+                          onChange={(e) => patchCover({ authorSize: Number(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Author vertical position */}
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-1.5">Author position</p>
+                        <div className="grid grid-cols-3 gap-1">
+                          {(['top', 'middle', 'bottom'] as const).map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => patchCover({ authorVPos: p })}
+                              className={`rounded border-2 px-2 py-1.5 text-xs capitalize transition-all ${authorVPos === p ? 'border-indigo-500 bg-indigo-100 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Logo / branding */}
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">

@@ -206,6 +206,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       logoOpacity: typeof (coverAsset?.metadata as Record<string, unknown> | null)?.logoOpacity === 'number'
         ? (coverAsset!.metadata as Record<string, unknown>).logoOpacity as number
         : 1,
+      coverTextColor: typeof (coverAsset?.metadata as Record<string, unknown> | null)?.textColor === 'string'
+        ? (coverAsset!.metadata as Record<string, unknown>).textColor as string
+        : undefined,
+      coverScrimOpacity: typeof (coverAsset?.metadata as Record<string, unknown> | null)?.scrimOpacity === 'number'
+        ? (coverAsset!.metadata as Record<string, unknown>).scrimOpacity as number
+        : undefined,
+      coverTitleSize: typeof (coverAsset?.metadata as Record<string, unknown> | null)?.titleSize === 'number'
+        ? (coverAsset!.metadata as Record<string, unknown>).titleSize as number
+        : undefined,
+      coverTitleVPos: (coverAsset?.metadata as Record<string, unknown> | null)?.titleVPos as 'top' | 'middle' | 'bottom' | undefined,
+      coverSubtitleSize: typeof (coverAsset?.metadata as Record<string, unknown> | null)?.subtitleSize === 'number'
+        ? (coverAsset!.metadata as Record<string, unknown>).subtitleSize as number
+        : undefined,
+      coverAuthorSize: typeof (coverAsset?.metadata as Record<string, unknown> | null)?.authorSize === 'number'
+        ? (coverAsset!.metadata as Record<string, unknown>).authorSize as number
+        : undefined,
+      coverAuthorVPos: (coverAsset?.metadata as Record<string, unknown> | null)?.authorVPos as 'top' | 'middle' | 'bottom' | undefined,
       chapters: chapters.map((c) => ({
         number: c.chapter_number,
         title: c.title,
