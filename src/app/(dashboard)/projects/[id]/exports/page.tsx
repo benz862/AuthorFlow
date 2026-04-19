@@ -460,7 +460,7 @@ export default function ExportsPage() {
                       value={purchaseUrl}
                       onChange={(e) => setPurchaseUrl(e.target.value)}
                       placeholder="https://authorflow.app/books/your-book"
-                      className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                     />
                     <p className="text-xs text-gray-400 mt-1">Leave blank if you want to fill it in later. The CTA page includes a button linking here.</p>
                   </div>
@@ -473,7 +473,7 @@ export default function ExportsPage() {
                       onChange={(e) => setCtaMessage(e.target.value)}
                       placeholder="The rest of the story unfolds into..."
                       maxLength={160}
-                      className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                     />
                     <p className="text-xs text-gray-400 mt-1">One italicized line above the Buy button. Keep it under 160 characters.</p>
                   </div>
