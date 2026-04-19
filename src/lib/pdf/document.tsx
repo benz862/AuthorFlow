@@ -61,6 +61,14 @@ export interface BookPdfProps {
   marginPreset?: MarginPresetKey
   copyrightYear?: number
   logoImageBuffer?: Buffer | null
+  /** If true, also place the logo on the cover page (in addition to title page). */
+  logoOnCover?: boolean
+  /** Where to put it on the cover — nine-grid position. Default 'br'. */
+  logoPosition?: 'tl' | 'tc' | 'tr' | 'cl' | 'center' | 'cr' | 'bl' | 'bc' | 'br'
+  /** Logo width as a percentage of cover width (5–40). Default 18. */
+  logoSizePct?: number
+  /** Logo opacity 0.1–1. Default 1. */
+  logoOpacity?: number
   exportMode?: ExportMode
   sampleOptions?: SampleOptions
   /** Total chapters in the FULL book — used on the CTA page copy. */
@@ -471,6 +479,34 @@ function buildStyles(
   return { sheet, markdown }
 }
 
+/**
+ * Compute an absolute-position style for the cover logo.
+ * `position` is a nine-grid key (tl, tc, tr, cl, center, cr, bl, bc, br).
+ * `sizePct` is width as a percentage of the cover width.
+ */
+function logoStyleForCover(
+  position: 'tl' | 'tc' | 'tr' | 'cl' | 'center' | 'cr' | 'bl' | 'bc' | 'br',
+  sizePct: number,
+  opacity: number,
+): Record<string, string | number> {
+  const margin = '5%'
+  const width = `${Math.max(5, Math.min(40, sizePct))}%`
+  const base: Record<string, string | number> = { position: 'absolute', width, opacity }
+
+  switch (position) {
+    case 'tl': return { ...base, top: margin, left: margin }
+    case 'tc': return { ...base, top: margin, left: '50%', transform: 'translateX(-50%)' }
+    case 'tr': return { ...base, top: margin, right: margin }
+    case 'cl': return { ...base, top: '50%', left: margin, transform: 'translateY(-50%)' }
+    case 'center': return { ...base, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+    case 'cr': return { ...base, top: '50%', right: margin, transform: 'translateY(-50%)' }
+    case 'bl': return { ...base, bottom: margin, left: margin }
+    case 'bc': return { ...base, bottom: margin, left: '50%', transform: 'translateX(-50%)' }
+    case 'br':
+    default: return { ...base, bottom: margin, right: margin }
+  }
+}
+
 export function BookPdf(props: BookPdfProps) {
   registerPreset(props.preset)
   const { sheet, markdown } = buildStyles(
@@ -498,7 +534,7 @@ export function BookPdf(props: BookPdfProps) {
       title={isSample ? `${props.title} — Sample` : props.title}
       author={props.authorName}
     >
-      {/* Cover — artwork, with optional title/subtitle/author overlay */}
+      {/* Cover — artwork, with optional title/subtitle/author overlay and optional logo */}
       {props.coverImageBuffer && (
         <Page size={pageSize} style={sheet.coverPage}>
           <Image src={props.coverImageBuffer} style={sheet.coverImage} />
@@ -517,6 +553,12 @@ export function BookPdf(props: BookPdfProps) {
                 <Text style={sheet.coverAuthor}>{props.authorName.toUpperCase()}</Text>
               </View>
             </>
+          )}
+          {props.logoImageBuffer && props.logoOnCover && (
+            <Image
+              src={props.logoImageBuffer}
+              style={logoStyleForCover(props.logoPosition ?? 'br', props.logoSizePct ?? 18, props.logoOpacity ?? 1)}
+            />
           )}
         </Page>
       )}

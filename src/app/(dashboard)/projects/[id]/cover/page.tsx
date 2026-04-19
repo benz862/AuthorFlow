@@ -7,9 +7,22 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { BookProject, BookAsset } from '@/lib/types/database'
-import { ImageIcon, RefreshCw, Download, Sparkles, Wand2, Upload, CheckCircle2 } from 'lucide-react'
+import { ImageIcon, RefreshCw, Download, Sparkles, Wand2, Upload, CheckCircle2, Trash2 } from 'lucide-react'
 
 type Mode = 'auto' | 'custom' | 'upload'
+type LogoPos = 'tl' | 'tc' | 'tr' | 'cl' | 'center' | 'cr' | 'bl' | 'bc' | 'br'
+
+const LOGO_POS_STYLE: Record<LogoPos, React.CSSProperties> = {
+  tl:     { top: '5%',  left: '5%' },
+  tc:     { top: '5%',  left: '50%', transform: 'translateX(-50%)' },
+  tr:     { top: '5%',  right: '5%' },
+  cl:     { top: '50%', left: '5%',  transform: 'translateY(-50%)' },
+  center: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+  cr:     { top: '50%', right: '5%', transform: 'translateY(-50%)' },
+  bl:     { bottom: '5%', left: '5%' },
+  bc:     { bottom: '5%', left: '50%', transform: 'translateX(-50%)' },
+  br:     { bottom: '5%', right: '5%' },
+}
 
 export default function CoverPage() {
   const params = useParams()
@@ -19,15 +32,18 @@ export default function CoverPage() {
   const [project, setProject] = useState<BookProject | null>(null)
   const [cover, setCover] = useState<BookAsset | null>(null)
   const [candidates, setCandidates] = useState<BookAsset[]>([])
+  const [logo, setLogo] = useState<BookAsset | null>(null)
   const [generating, setGenerating] = useState(false)
   const [enhancing, setEnhancing] = useState(false)
   const [selecting, setSelecting] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [error, setError] = useState('')
 
   const [mode, setMode] = useState<Mode>('auto')
   const [customPrompt, setCustomPrompt] = useState('')
   const uploadRef = useRef<HTMLInputElement>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     supabase.from('book_projects').select('*').eq('id', projectId).single().then(({ data }) => setProject(data))
@@ -40,18 +56,60 @@ export default function CoverPage() {
       .from('book_assets')
       .select('*')
       .eq('project_id', projectId)
-      .in('asset_type', ['cover', 'cover_candidate'])
+      .in('asset_type', ['cover', 'cover_candidate', 'logo'])
       .order('created_at', { ascending: false })
     const all = (data ?? []) as BookAsset[]
     const current = all.find((a) => a.asset_type === 'cover') ?? null
     setCover(current)
+    const latestLogo = all.find((a) => a.asset_type === 'logo') ?? null
+    setLogo(latestLogo)
     // Group the most recent candidates (same batchId as the current batch)
+    const covers = all.filter((a) => a.asset_type === 'cover' || a.asset_type === 'cover_candidate')
     const meta = (a: BookAsset | undefined) => ((a?.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>
-    const latestBatch = meta(all[0]).batchId as string | undefined
+    const latestBatch = meta(covers[0]).batchId as string | undefined
     const latestCandidates = latestBatch
-      ? all.filter((a) => meta(a).batchId === latestBatch)
-      : all.filter((a) => a.asset_type === 'cover_candidate').slice(0, 4)
+      ? covers.filter((a) => meta(a).batchId === latestBatch)
+      : covers.filter((a) => a.asset_type === 'cover_candidate').slice(0, 4)
     setCandidates(latestCandidates)
+  }
+
+  const handleLogoUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) { setError('Please upload an image file.'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('Logo must be under 5 MB.'); return }
+    setUploadingLogo(true)
+    setError('')
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`/api/projects/${projectId}/logo`, { method: 'POST', body: form })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error ?? 'Logo upload failed'); setUploadingLogo(false); return }
+    setLogo(data.asset)
+    // If we have a cover, turn on logoOnCover by default
+    if (cover) await patchCover({ logoOnCover: true })
+    setUploadingLogo(false)
+  }
+
+  const handleLogoDelete = async () => {
+    await fetch(`/api/projects/${projectId}/logo`, { method: 'DELETE' })
+    setLogo(null)
+    if (cover) await patchCover({ logoOnCover: false })
+  }
+
+  const patchCover = async (patch: Record<string, unknown>) => {
+    if (!cover) return
+    const prev = cover
+    const prevMeta = (cover.metadata as Record<string, unknown> | null) ?? {}
+    setCover({ ...cover, metadata: { ...prevMeta, ...patch } as never })
+    const res = await fetch(`/api/projects/${projectId}/cover-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assetId: cover.id, ...patch }),
+    })
+    if (!res.ok) {
+      setCover(prev)
+      const data = await res.json().catch(() => ({}))
+      setError(data.error ?? 'Failed to update')
+    }
   }
 
   const handleGenerate = async () => {
@@ -101,20 +159,7 @@ export default function CoverPage() {
   }
 
   const handleToggleOverlay = async (next: boolean) => {
-    if (!cover) return
-    // Optimistic update
-    const prev = cover
-    setCover({ ...cover, metadata: { ...(cover.metadata as object ?? {}), overlayTitle: next } as never })
-    const res = await fetch(`/api/projects/${projectId}/cover-settings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assetId: cover.id, overlayTitle: next }),
-    })
-    if (!res.ok) {
-      setCover(prev)
-      const data = await res.json().catch(() => ({}))
-      setError(data.error ?? 'Failed to update cover setting')
-    }
+    await patchCover({ overlayTitle: next })
   }
 
   const handleUpload = async (file: File) => {
@@ -252,51 +297,173 @@ export default function CoverPage() {
             </div>
           </div>
         ) : cover ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-            <div className="flex justify-center">
-              <div className="relative w-64 shadow-2xl rounded-lg overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={cover.public_url ?? ''} alt="Book cover" className="w-full" />
-              </div>
-            </div>
-
-            {/* Title overlay toggle */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
             {(() => {
               const meta = (cover.metadata as Record<string, unknown> | null) ?? {}
               const overlay = meta.overlayTitle !== false // default true
+              const logoOnCover = !!meta.logoOnCover
+              const logoPosition = (meta.logoPosition as LogoPos) ?? 'br'
+              const logoSizePct = typeof meta.logoSizePct === 'number' ? meta.logoSizePct : 18
+              const logoOpacity = typeof meta.logoOpacity === 'number' ? meta.logoOpacity : 1
+
               return (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Overlay title & author on cover</p>
-                    <p className="text-xs text-gray-500">Turn off if your cover already has the title and author baked in.</p>
+                <>
+                  {/* Live preview */}
+                  <div className="flex justify-center">
+                    <div className="relative w-64 shadow-2xl rounded-lg overflow-hidden" style={{ aspectRatio: '3 / 4' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cover.public_url ?? ''} alt="Book cover" className="w-full h-full object-cover" />
+                      {logo && logoOnCover && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={logo.public_url ?? ''}
+                          alt="Logo"
+                          style={{
+                            position: 'absolute',
+                            width: `${logoSizePct}%`,
+                            opacity: logoOpacity,
+                            ...LOGO_POS_STYLE[logoPosition],
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleOverlay(!overlay)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${overlay ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                    aria-pressed={overlay}
-                  >
-                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${overlay ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                  </button>
-                </div>
+
+                  {/* Title overlay toggle */}
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Overlay title &amp; author on cover</p>
+                      <p className="text-xs text-gray-500">Turn off if your cover already has text baked in.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleOverlay(!overlay)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${overlay ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                      aria-pressed={overlay}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${overlay ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+
+                  {/* Logo / branding */}
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">Logo on cover</p>
+                        <p className="text-xs text-gray-500">Upload a transparent PNG for best results.</p>
+                      </div>
+                      {logo ? (
+                        <div className="flex items-center gap-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={logo.public_url ?? ''} alt="Logo preview" className="h-10 w-10 object-contain bg-white rounded border border-gray-200" />
+                          <Button type="button" variant="outline" size="sm" onClick={handleLogoDelete} className="gap-1">
+                            <Trash2 className="h-3.5 w-3.5" /> Remove
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                            className="hidden"
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }}
+                          />
+                          <Button type="button" variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} loading={uploadingLogo} className="gap-1.5">
+                            <Upload className="h-3.5 w-3.5" /> Upload logo
+                          </Button>
+                        </>
+                      )}
+                    </div>
+
+                    {logo && (
+                      <>
+                        <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-200">
+                          <p className="text-sm text-gray-900">Show logo on cover</p>
+                          <button
+                            type="button"
+                            onClick={() => patchCover({ logoOnCover: !logoOnCover })}
+                            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${logoOnCover ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                            aria-pressed={logoOnCover}
+                          >
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${logoOnCover ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                          </button>
+                        </div>
+
+                        {logoOnCover && (
+                          <div className="space-y-3 pt-2 border-t border-gray-200">
+                            <div>
+                              <p className="text-xs font-medium text-gray-600 mb-1.5">Position</p>
+                              <div className="grid grid-cols-3 gap-1 w-32">
+                                {(['tl','tc','tr','cl','center','cr','bl','bc','br'] as LogoPos[]).map((p) => (
+                                  <button
+                                    key={p}
+                                    type="button"
+                                    onClick={() => patchCover({ logoPosition: p })}
+                                    className={`aspect-square rounded border-2 transition-all ${logoPosition === p ? 'border-indigo-500 bg-indigo-100' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                                    title={p}
+                                  >
+                                    <span className="block w-1.5 h-1.5 rounded-full bg-indigo-600 mx-auto" style={{ opacity: logoPosition === p ? 1 : 0.3 }} />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-xs font-medium text-gray-600">Size</p>
+                                <span className="text-xs text-gray-500">{logoSizePct}% of cover width</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={5}
+                                max={40}
+                                step={1}
+                                value={logoSizePct}
+                                onChange={(e) => patchCover({ logoSizePct: Number(e.target.value) })}
+                                className="w-full"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-xs font-medium text-gray-600">Opacity</p>
+                                <span className="text-xs text-gray-500">{Math.round(logoOpacity * 100)}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={0.1}
+                                max={1}
+                                step={0.05}
+                                value={logoOpacity}
+                                onChange={(e) => patchCover({ logoOpacity: Number(e.target.value) })}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {cover.public_url && (
+                    <div className="flex justify-center">
+                      <a href={cover.public_url} download>
+                        <Button variant="outline" className="gap-1.5">
+                          <Download className="h-4 w-4" /> Download Cover (artwork only)
+                        </Button>
+                      </a>
+                    </div>
+                  )}
+                  {(cover as unknown as { generation_prompt?: string }).generation_prompt && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Generation prompt</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{(cover as unknown as { generation_prompt?: string }).generation_prompt}</p>
+                    </div>
+                  )}
+                </>
               )
             })()}
-
-            {cover.public_url && (
-              <div className="flex justify-center">
-                <a href={cover.public_url} download>
-                  <Button variant="outline" className="gap-1.5">
-                    <Download className="h-4 w-4" /> Download Cover
-                  </Button>
-                </a>
-              </div>
-            )}
-            {(cover as unknown as { generation_prompt?: string }).generation_prompt && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs font-medium text-gray-500 mb-1">Generation prompt</p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{(cover as unknown as { generation_prompt?: string }).generation_prompt}</p>
-              </div>
-            )}
           </div>
         ) : (
           <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">

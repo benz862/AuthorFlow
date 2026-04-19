@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { checkEntitlement } from '@/lib/entitlements/service'
 import { renderBookPdf } from '@/lib/pdf/render'
+type BookPdfLogoPos = 'tl' | 'tc' | 'tr' | 'cl' | 'center' | 'cr' | 'bl' | 'bc' | 'br'
 import { getFontPreset } from '@/lib/pdf/fonts'
 import { getTrim, TextSizeKey, MarginPresetKey } from '@/lib/pdf/trim-sizes'
 
@@ -197,6 +198,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       coverImageBuffer: coverBuffer,
       logoImageBuffer: logoBuffer,
       overlayCoverText: ((coverAsset?.metadata as Record<string, unknown> | null)?.overlayTitle ?? true) !== false,
+      logoOnCover: !!(coverAsset?.metadata as Record<string, unknown> | null)?.logoOnCover && !!logoBuffer,
+      logoPosition: ((coverAsset?.metadata as Record<string, unknown> | null)?.logoPosition as BookPdfLogoPos) ?? 'br',
+      logoSizePct: typeof (coverAsset?.metadata as Record<string, unknown> | null)?.logoSizePct === 'number'
+        ? (coverAsset!.metadata as Record<string, unknown>).logoSizePct as number
+        : 18,
+      logoOpacity: typeof (coverAsset?.metadata as Record<string, unknown> | null)?.logoOpacity === 'number'
+        ? (coverAsset!.metadata as Record<string, unknown>).logoOpacity as number
+        : 1,
       chapters: chapters.map((c) => ({
         number: c.chapter_number,
         title: c.title,
