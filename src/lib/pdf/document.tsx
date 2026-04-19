@@ -88,6 +88,8 @@ function registerPreset(preset: FontPreset) {
       fonts: [
         { src: preset.heading.regular },
         { src: preset.heading.bold, fontWeight: 'bold' },
+        { src: preset.heading.italic, fontStyle: 'italic' },
+        { src: preset.heading.boldItalic, fontWeight: 'bold', fontStyle: 'italic' },
       ],
     })
     registered.add(headKey)

@@ -29,6 +29,8 @@ export interface FontPreset {
     family: string
     regular: string
     bold: string
+    italic: string
+    boldItalic: string
   }
 }
 
@@ -60,6 +62,8 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
       family: 'Montserrat',
       regular: fsUrl('montserrat', 400, 'normal'),
       bold: fsUrl('montserrat', 700, 'normal'),
+      italic: fsUrl('montserrat', 400, 'italic'),
+      boldItalic: fsUrl('montserrat', 700, 'italic'),
     },
   },
   modern: {
@@ -78,6 +82,8 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
       family: 'Inter',
       regular: fsUrl('inter', 400, 'normal'),
       bold: fsUrl('inter', 700, 'normal'),
+      italic: fsUrl('inter', 400, 'italic'),
+      boldItalic: fsUrl('inter', 700, 'italic'),
     },
   },
   literary: {
@@ -96,6 +102,8 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
       family: 'Playfair Display',
       regular: fsUrl('playfair-display', 400, 'normal'),
       bold: fsUrl('playfair-display', 700, 'normal'),
+      italic: fsUrl('playfair-display', 400, 'italic'),
+      boldItalic: fsUrl('playfair-display', 700, 'italic'),
     },
   },
   technical: {
@@ -114,6 +122,8 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
       family: 'Source Sans Pro',
       regular: fsUrl('source-sans-pro', 400, 'normal'),
       bold: fsUrl('source-sans-pro', 700, 'normal'),
+      italic: fsUrl('source-sans-pro', 400, 'italic'),
+      boldItalic: fsUrl('source-sans-pro', 700, 'italic'),
     },
   },
   friendly: {
@@ -132,6 +142,8 @@ export const FONT_PRESETS: Record<FontPresetKey, FontPreset> = {
       family: 'Nunito',
       regular: fsUrl('nunito', 400, 'normal'),
       bold: fsUrl('nunito', 700, 'normal'),
+      italic: fsUrl('nunito', 400, 'italic'),
+      boldItalic: fsUrl('nunito', 700, 'italic'),
     },
   },
 }
