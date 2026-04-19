@@ -31,9 +31,15 @@ export default function NewProjectPage() {
     if (!response.ok) {
       setError(result.error ?? 'Failed to create project')
       setLoading(false)
-    } else {
-      router.push(`/projects/${result.id}/intake`)
+      return
     }
+    const projectId = result.project?.id ?? result.id
+    if (!projectId) {
+      setError('Project created but no ID returned. Please refresh.')
+      setLoading(false)
+      return
+    }
+    router.push(`/projects/${projectId}/intake`)
   }
 
   const steps = [
